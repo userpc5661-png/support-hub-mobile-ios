@@ -1,0 +1,19 @@
+Wasl Mobile 2.8.2+43
+====================
+
+1. Back up your current project.
+2. Extract this ZIP over your CURRENT Wasl mobile project and allow overwrite.
+3. Do not delete your existing assets/fonts folder; this update does not include font binaries.
+4. From PowerShell in the project folder run:
+
+& "E:\flutter\bin\flutter.bat" clean
+& "E:\flutter\bin\flutter.bat" pub get
+& "E:\flutter\bin\flutter.bat" analyze
+& "E:\flutter\bin\flutter.bat" test
+& "E:\flutter\bin\flutter.bat" run
+
+Expected: no analyzer errors and all tests pass.
+
+Notes:
+- In-app notification banners now work from conversation realtime events even when Firebase is not configured.
+- Background/terminated push still needs valid Firebase build defines and matching server-side FCM credentials.

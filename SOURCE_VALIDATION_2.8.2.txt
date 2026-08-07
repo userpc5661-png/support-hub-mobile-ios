@@ -1,0 +1,14 @@
+Wasl Mobile 2.8.2+43 source review
+==================================
+- Used the delivered 2.8.1+42 cumulative update as the base.
+- Changed the default dark palette from green-tinted surfaces to neutral charcoal/black surfaces.
+- Kept Wasl mint as the interactive accent rather than the dark-mode base color.
+- Aligned default chat colors with the neutral dark palette.
+- Reworked the selected bottom-navigation item into a true circular 44x44 treatment.
+- Kept Android navigation to one opaque surface and added an iOS-ready blur/translucency path.
+- Added realtime-driven in-app notification banners independent of FCM foreground delivery.
+- Added FCM/realtime notification deduplication and exact-conversation opening.
+- Preserved unread badge refresh and the existing Notifications screen.
+- Static delimiter/structure checks are run on all Dart files and ZIP integrity is checked before delivery.
+
+Note: A Flutter SDK is not available in this build environment, so flutter analyze/test must be run on the user's machine after extraction.

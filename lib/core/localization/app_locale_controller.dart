@@ -1,0 +1,1363 @@
+import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
+class AppLocaleController extends ChangeNotifier {
+  static const _storageKey = 'app_language';
+  static Locale _current = const Locale('ar');
+
+  Locale get locale => _current;
+  static bool get isArabic => _current.languageCode == 'ar';
+
+  Future<void> initialize() async {
+    final preferences = await SharedPreferences.getInstance();
+    final saved = preferences.getString(_storageKey);
+    final systemLanguage = WidgetsBinding
+        .instance.platformDispatcher.locale.languageCode
+        .toLowerCase();
+    _current = Locale(saved == 'en' || saved == 'ar'
+        ? saved!
+        : (systemLanguage == 'ar' ? 'ar' : 'en'));
+    notifyListeners();
+  }
+
+  Future<void> setLanguage(String code) async {
+    if (code != 'ar' && code != 'en') return;
+    if (_current.languageCode == code) return;
+    _current = Locale(code);
+    final preferences = await SharedPreferences.getInstance();
+    await preferences.setString(_storageKey, code);
+    notifyListeners();
+  }
+}
+
+class AppLocaleScope extends InheritedNotifier<AppLocaleController> {
+  const AppLocaleScope(
+      {super.key,
+      required AppLocaleController controller,
+      required super.child})
+      : super(notifier: controller);
+
+  static AppLocaleController of(BuildContext context) {
+    final scope = context.dependOnInheritedWidgetOfExactType<AppLocaleScope>();
+    assert(scope != null, 'AppLocaleScope was not found.');
+    return scope!.notifier!;
+  }
+}
+
+class LanguageSwitcherButton extends StatelessWidget {
+  const LanguageSwitcherButton({super.key, this.showLabel = false});
+  final bool showLabel;
+
+  @override
+  Widget build(BuildContext context) {
+    final controller = AppLocaleScope.of(context);
+    final current = controller.locale.languageCode;
+    final scheme = Theme.of(context).colorScheme;
+    final selectedLabel = current == 'ar' ? 'العربية' : 'English';
+    return Semantics(
+      button: true,
+      label: tr('اللغة'),
+      child: PopupMenuButton<String>(
+        tooltip: tr('اللغة'),
+        onSelected: controller.setLanguage,
+        position: PopupMenuPosition.under,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        itemBuilder: (_) => [
+          CheckedPopupMenuItem(
+            value: 'ar',
+            checked: current == 'ar',
+            child: const Text('العربية'),
+          ),
+          CheckedPopupMenuItem(
+            value: 'en',
+            checked: current == 'en',
+            child: const Text('English'),
+          ),
+        ],
+        child: Container(
+          constraints: const BoxConstraints(minHeight: 44),
+          padding: EdgeInsetsDirectional.fromSTEB(
+            showLabel ? 14 : 11,
+            9,
+            showLabel ? 12 : 9,
+            9,
+          ),
+          decoration: BoxDecoration(
+            color: scheme.surface,
+            borderRadius: BorderRadius.circular(999),
+            border: Border.all(
+              color: scheme.outlineVariant.withValues(alpha: .72),
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: .035),
+                blurRadius: 10,
+                offset: const Offset(0, 3),
+              ),
+            ],
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.translate_rounded, size: 19, color: scheme.primary),
+              if (showLabel) ...[
+                const SizedBox(width: 8),
+                Text(
+                  selectedLabel,
+                  style: const TextStyle(fontWeight: FontWeight.w800),
+                ),
+              ],
+              const SizedBox(width: 4),
+              Icon(
+                Icons.keyboard_arrow_down_rounded,
+                size: 18,
+                color: scheme.onSurfaceVariant,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+String tr(String value) {
+  if (AppLocaleController.isArabic) return value;
+  final exact = _english[value];
+  if (exact != null) return exact;
+  return _translateDynamic(value);
+}
+
+String _translateDynamic(String value) {
+  Match? m;
+  if ((m = RegExp(r'^أغلق (.+) (?:المحادثة|الدردشة) ويمكن عرض الرسائل دون تعديل\.$').firstMatch(value)) != null) {
+    return '${m!.group(1)} closed this conversation. Messages remain read-only.';
+  }
+  if ((m = RegExp(r'^(.+) صلاحية مفعلة$').firstMatch(value)) != null) {
+    return '${m!.group(1)} active permissions';
+  }
+  if ((m = RegExp(r'^(.+) عميل في مساحة العمل$').firstMatch(value)) != null) {
+    return '${m!.group(1)} customers in this workspace';
+  }
+  if ((m = RegExp(r'^الدردشة يعمل عليها (.+) الآن$').firstMatch(value)) !=
+      null) {
+    return 'This chat is being handled by ${m!.group(1)}';
+  }
+  if ((m = RegExp(r'^الدردشة قيد المعالجة بواسطة (.+)$').firstMatch(value)) !=
+      null) {
+    return 'This chat is being handled by ${m!.group(1)}';
+  }
+  if ((m = RegExp(r'^(.+) داخل الدردشة الآن$').firstMatch(value)) != null) {
+    return '${m!.group(1)} is viewing this chat';
+  }
+  if ((m = RegExp(r'^إصدار API: (.+)$').firstMatch(value)) != null) {
+    return 'API version: ${m!.group(1)}';
+  }
+  if ((m = RegExp(r'^رسالة جديدة من (.+)$').firstMatch(value)) != null) {
+    return 'New message from ${m!.group(1)}';
+  }
+  if ((m = RegExp(r'^(.+) (?:محادثة|دردشة) · متابعة موحّدة لرسائل العملاء$')
+          .firstMatch(value)) !=
+      null) {
+    return '${m!.group(1)} conversations · One place for customer messages';
+  }
+  if ((m = RegExp(r'^متابعة في (.+)$').firstMatch(value)) != null) {
+    return 'Follow up on ${m!.group(1)}';
+  }
+  if ((m = RegExp(r'^متابعة (.+)$').firstMatch(value)) != null) {
+    return 'Follow-up ${m!.group(1)}';
+  }
+  if ((m = RegExp(r'^الوسوم \((.+)\)$').firstMatch(value)) != null) {
+    return 'Tags (${m!.group(1)})';
+  }
+  if ((m = RegExp(r'^لديك (.+) رسالة غير مقروءة$').firstMatch(value)) != null) {
+    return 'You have ${m!.group(1)} unread messages';
+  }
+  if ((m = RegExp(r'^في (.+) دردشة تحتاج انتباهك\.$').firstMatch(value)) !=
+      null) {
+    return '${m!.group(1)} chats need your attention.';
+  }
+  if ((m = RegExp(r'^أهلًا (.+)$').firstMatch(value)) != null) {
+    return 'Hello ${m!.group(1)}';
+  }
+  if ((m = RegExp(r'^(.+) رسالة في (.+) (?:محادثة|دردشة) تحتاج انتباهك$')
+          .firstMatch(value)) !=
+      null) {
+    return '${m!.group(1)} messages in ${m.group(2)} conversations need your attention';
+  }
+  if ((m = RegExp(r'^(.+) غير مقروءة$').firstMatch(value)) != null) {
+    return '${m!.group(1)} unread';
+  }
+  if ((m = RegExp(r'^(.+) من (.+) رسالة$').firstMatch(value)) != null) {
+    return '${m!.group(1)} of ${m.group(2)} messages';
+  }
+  if ((m = RegExp(r'^التغير عن الشهر السابق: (.+)%$').firstMatch(value)) !=
+      null) {
+    return 'Change from last month: ${m!.group(1)}%';
+  }
+  if ((m = RegExp(r'^(.+) موظفين$').firstMatch(value)) != null) {
+    return '${m!.group(1)} employees';
+  }
+  if ((m = RegExp(r'^حذف "(.+)" من قاعدة المعرفة\?$').firstMatch(value)) !=
+      null) {
+    return 'Delete "${m!.group(1)}" from the knowledge base?';
+  }
+  if (value.startsWith('النظام\n')) {
+    return value.replaceFirst('النظام', 'System');
+  }
+  if ((m = RegExp(r'^ملاحظة داخلية — (.+)$').firstMatch(value)) != null) {
+    return 'Internal note — ${_word(m!.group(1)!)}';
+  }
+  if ((m = RegExp(r'^جلسة دعم نشطة داخل (.+)$').firstMatch(value)) != null) {
+    return 'Active support session in ${_word(m!.group(1)!)}';
+  }
+  if ((m = RegExp(r'^مرحبًا، (.+)$').firstMatch(value)) != null) {
+    return 'Welcome, ${m!.group(1)}';
+  }
+  if ((m = RegExp(r'^الاشتراك: (.+)$').firstMatch(value)) != null) {
+    return 'Subscription: ${m!.group(1)}';
+  }
+  if ((m =
+          RegExp(r'^الحالة: (.+) • الرسائل: (.+) / (.+)$').firstMatch(value)) !=
+      null) {
+    return 'Status: ${_word(m!.group(1)!)} • Messages: ${m.group(2)} / ${m.group(3)}';
+  }
+  if ((m = RegExp(r'^تغيير كلمة مرور (.+)$').firstMatch(value)) != null) {
+    return 'Change ${m!.group(1)} password';
+  }
+  if ((m = RegExp(r'^المعرّف: (.+)$').firstMatch(value)) != null) {
+    return 'Identifier: ${m!.group(1)}';
+  }
+  if ((m = RegExp(r'^بدء جلسة دعم — (.+)$').firstMatch(value)) != null) {
+    return 'Start support session — ${m!.group(1)}';
+  }
+  if ((m = RegExp(r'^سيتم تغيير كلمة مرور @(.+) وتفعيل الحساب\.$')
+          .firstMatch(value)) !=
+      null) {
+    return 'The password for @${m!.group(1)} will be changed and the account activated.';
+  }
+  if ((m = RegExp(
+              r'^سيتم حذف متجر «(.+)» وجميع الموظفين والعملاء(?: والمحادثات| والدردشات) والرسائل والإعدادات المرتبطة به\. لا يمكن التراجع عن هذه العملية\.$')
+          .firstMatch(value)) !=
+      null) {
+    return 'Store “${m!.group(1)}” and all related employees, customers, chats, messages, and settings will be deleted. This cannot be undone.';
+  }
+  if ((m = RegExp(r'^للتأكيد اكتب المعرّف التالي: (.+)$').firstMatch(value)) !=
+      null) {
+    return 'To confirm, enter this identifier: ${m!.group(1)}';
+  }
+  if ((m = RegExp(r'^اكتب (.+) بالضبط\.$').firstMatch(value)) != null) {
+    return 'Enter ${m!.group(1)} exactly.';
+  }
+  if ((m = RegExp(r'^الحالة: (.+)$').firstMatch(value)) != null) {
+    return 'Status: ${_word(m!.group(1)!)}';
+  }
+  if ((m = RegExp(r'^عدد الموظفين: (.+)$').firstMatch(value)) != null) {
+    return 'Employees: ${m!.group(1)}';
+  }
+  if ((m = RegExp(r'^المالك: (.+) — @(.+)$').firstMatch(value)) != null) {
+    return 'Owner: ${m!.group(1)} — @${m.group(2)}';
+  }
+  if ((m = RegExp(r'^بريد المتجر: (.+)$').firstMatch(value)) != null) {
+    return 'Store email: ${m!.group(1)}';
+  }
+  if ((m = RegExp(r'^الهاتف: (.+)$').firstMatch(value)) != null) {
+    return 'Phone: ${m!.group(1)}';
+  }
+  if ((m = RegExp(r'^المتبقي من المدة: (.+) يوم$').firstMatch(value)) != null) {
+    return 'Days remaining: ${m!.group(1)}';
+  }
+  if ((m = RegExp(r'^نهاية الاشتراك: (.+)$').firstMatch(value)) != null) {
+    return 'Subscription ends: ${m!.group(1)}';
+  }
+  if ((m = RegExp(r'^المدة المتبقية: (.+) يوم$').firstMatch(value)) != null) {
+    return 'Remaining period: ${m!.group(1)} days';
+  }
+  if ((m = RegExp(r'^الرسائل: (.+)$').firstMatch(value)) != null) {
+    return 'Messages: ${m!.group(1)}';
+  }
+  if ((m = RegExp(r'^الموظفون: (.+)$').firstMatch(value)) != null) {
+    return 'Employees: ${m!.group(1)}';
+  }
+  if ((m = RegExp(r'^AI: (نعم|لا)$').firstMatch(value)) != null) {
+    return 'AI: ${_word(m!.group(1)!)}';
+  }
+  if ((m = RegExp(r'^واتساب: (نعم|لا)$').firstMatch(value)) != null) {
+    return 'WhatsApp: ${_word(m!.group(1)!)}';
+  }
+  if ((m = RegExp(r'^إدارة اشتراك (.*)$').firstMatch(value)) != null) {
+    return 'Manage subscription — ${m!.group(1)}';
+  }
+  if ((m = RegExp(r'^(.+) / غير محدود$').firstMatch(value)) != null) {
+    return '${m!.group(1)} / Unlimited';
+  }
+  if ((m = RegExp(r'^المدة: (.+)$').firstMatch(value)) != null) {
+    return 'Duration: ${_word(m!.group(1)!)}';
+  }
+  if ((m = RegExp(r'^ينتهي: (.+)$').firstMatch(value)) != null) {
+    return 'Expires: ${m!.group(1)}';
+  }
+  if ((m = RegExp(r'^السبب: (.+)$').firstMatch(value)) != null) {
+    return 'Reason: ${m!.group(1)}';
+  }
+  if ((m = RegExp(r'^إعداد (.+)$').firstMatch(value)) != null) {
+    return 'Configure ${m!.group(1)}';
+  }
+  if ((m = RegExp(r'^لا يمكن الحفظ\. أكمل الحقول المطلوبة: (.+)$')
+          .firstMatch(value)) !=
+      null) {
+    return 'Cannot save. Complete the required fields: ${m!.group(1)!.replaceAll('،', ',')}';
+  }
+  if ((m = RegExp(r'^طريقة ربط (.+)$').firstMatch(value)) != null) {
+    return '${m!.group(1)} connection guide';
+  }
+  return value;
+}
+
+String _word(String value) =>
+    const {
+      'النظام': 'System',
+      'موظف': 'Agent',
+      'المتجر': 'the store',
+      'نشط': 'Active',
+      'موقوف': 'Suspended',
+      'نعم': 'Yes',
+      'لا': 'No',
+      'ساعة واحدة': 'One hour',
+      '24 ساعة': '24 hours',
+      'حتى يتم الإلغاء': 'Until revoked',
+    }[value] ??
+    value;
+
+const Map<String, String> _english = {
+  'إشعارات الجهاز': 'Device notifications',
+  'الإشعارات مفعلة خارج التطبيق.': 'Notifications are enabled outside the app.',
+  'فعّل الإشعارات لتظهر رسائل العملاء عندما يكون التطبيق في الخلفية أو مغلقًا.': 'Enable notifications to see customer messages while the app is in the background or closed.',
+  'Firebase غير مهيأ لهذا الإصدار. أضف إعدادات Firebase أولًا.': 'Firebase is not configured for this build. Add the Firebase configuration first.',
+  'تم تفعيل إشعارات الجهاز.': 'Device notifications are enabled.',
+  'لم يتم السماح بالإشعارات. فعّلها من إعدادات الجهاز.': 'Notifications were not allowed. Enable them from the device settings.',
+  'الملف أكبر من الحجم المسموح.': 'The file exceeds the allowed size.',
+  'مسح': 'Clear',
+  'أهلًا بك في وصل': 'Welcome to Wasl',
+  "شريط التنقل السفلي": "Bottom navigation bar",
+  "الردود المخصصة": "Custom replies",
+  "يضيفها صاحب المتجر من لوحة وصل.": "They are added by the store owner from the Wasl dashboard.",
+  "لا توجد ردود مخصصة بعد.": "No custom replies have been added yet.",
+  'البحث في المحادثات': 'Search conversations',
+  'الحسابات المحفوظة': 'Saved accounts',
+  'استخدام حساب آخر': 'Use another account',
+  'إزالة الحساب المحفوظ': 'Remove saved account',
+  'تم حفظ الحساب على هذا الجهاز.': 'This account was saved on this device.',
+  'انتهت جلسة هذا الحساب. سجّل الدخول من جديد.': 'This account session expired. Sign in again.',
+  'الصورة الشخصية': 'Profile photo',
+  'تغيير الصورة الشخصية': 'Change profile photo',
+  'تعذر تحديث الصورة الشخصية.': 'Could not update profile photo.',
+  'تم تحديث الصورة الشخصية.': 'Profile photo updated.',
+  'حجم الصورة كبير جدًا.': 'The image is too large.',
+  'نوع الملف غير مدعوم.': 'This file type is not supported.',
+  'حجم الفيديو يتجاوز 16 ميجابايت.': 'The video exceeds 16 MB.',
+  'حجم المستند يتجاوز 100 ميجابايت.': 'The document exceeds 100 MB.',
+  'حجم الصورة يتجاوز 5 ميجابايت.': 'The image exceeds 5 MB.',
+  'الرئيسية': 'Home',
+  'القناة الرئيسية': 'Main channel',
+  'رقم القناة غير متاح': 'Channel number unavailable',
+  'إظهار البحث': 'Show search',
+  'إخفاء البحث': 'Hide search',
+  'المحادثات الحالية': 'Current conversations',
+  'عرض الدردشات': 'Show chats',
+  'عرض الملغاة': 'Show cancelled',
+  'مسندة إليّ': 'Assigned to me',
+  'مشاهدة المحادثات':
+      'View conversations',
+  'فتح صندوق المحادثات.':
+      'Open the conversation inbox.',
+  'توزيع المحادثات':
+      'Assign conversations',
+  'إسناد المحادثات لفريق الدعم.':
+      'Assign conversations to the support team.',
+  'إغلاق المحادثات وتغيير حالتها وأولويتها.':
+      'Close conversations and change their status and priority.',
+  'تحكم كامل في وصول مدير المنصة للمحادثات':
+      'Full control over platform administrator access to conversations',
+  'المحادثات خاصة':
+      'Conversations are private',
+  'مدير المنصة لا يستطيع قراءة محادثات المتجر.':
+      'The platform administrator cannot read store conversations.',
+  '• الإعداد الافتراضي مغلق.\n• كل جلسة دعم لها سبب ووقت انتهاء.\n• قراءة أي محادثة أثناء جلسة الدعم تُسجل في سجل التدقيق.\n• يمكنك إلغاء الصلاحية فورًا في أي وقت.':
+      '• Access is off by default.\n• Every support session has a reason and expiry time.\n• Any conversation opened during support is recorded in the audit log.\n• You can revoke access immediately at any time.',
+  'Wasl — دردشات أسرع، تنبيهات للرسائل، وعزل آمن للمتاجر.':
+      'Wasl — faster chats, message alerts, and secure store isolation.',
+  'الهوية وبيانات التواصل':
+      'Identity and contact details',
+  'المحادثات اليدوية':
+      'Manual conversations',
+  'إنشاء محادثات يدوية':
+      'Create manual conversations',
+  'ملخص أداء المتجر وحركة المحادثات':
+      'Store performance and conversation activity summary',
+  'المحادثات':
+      'Chats',
+  'المحادثات المفتوحة':
+      'Open conversations',
+  'أحدث المحادثات':
+      'Latest conversations',
+  'لا توجد محادثات حتى الآن.':
+      'No conversations yet.',
+  'ملء الشاشة':
+      'Full screen',
+  'الهوية وبيانات التواصل والحالة التشغيلية':
+      'Identity, contact details, and operational status',
+  'صاحب المتجر لم يمنح مدير المنصة صلاحية مؤقتة لقراءة المحادثات. يمكن إدارة المتجر، لكن لا يمكن دخول جلسة الدعم الخاصة.':
+      'The store owner has not granted temporary conversation access to the platform administrator. The store can still be managed, but a private support session cannot be opened.',
+  'سيتم تسجيل وقت الجلسة وسببها وكل محادثة تُفتح أثناءها.':
+      'The session time, reason, and every conversation opened during it will be recorded.',
+  'تطبيق الجوال مخصص لموظفي ومشرفي الدعم الذين لديهم صلاحيات الدردشات والعملاء. استخدم لوحة الويب للإدارة.':
+      'The mobile app is only for support employees and supervisors with chat and customer permissions. Use the web dashboard for administration.',
+  'اللون الأساسي': 'Primary color',
+  'اللون المساعد': 'Accent color',
+  'فقاعة الرسائل المرسلة': 'Sent message bubble',
+  'فقاعة الرسائل المستلمة': 'Received message bubble',
+  'خلفية التطبيق': 'App background',
+  'البطاقات والأسطح': 'Cards and surfaces',
+  'اختياري — اختر بصريًا بدون أكواد أو أرقام.':
+      'Optional — choose visually without codes or numbers.',
+  'اختر اللون المناسب وسيُطبّق مباشرة.':
+      'Choose a color and it will be applied immediately.',
+  'استخدام لون اللوحة الجاهزة': 'Use the preset palette color',
+  'المنصة': 'Platform',
+  'الإدارة': 'Management',
+  'المتاجر والاشتراكات وحالة النظام':
+      'Stores, subscriptions, and system status',
+  'أدوات مساحة العمل': 'Workspace tools',
+  'تظهر هنا الأدوات المسموحة لهذا الحساب فقط.':
+      'Only tools allowed for this account appear here.',
+  'جلسة دعم نشطة داخل هذا المتجر': 'An active support session in this store',
+  'إنشاء المتاجر وإدارتها': 'Create and manage stores',
+  'المديرون والمشرفون والموظفون': 'Managers, supervisors, and employees',
+  'إدارة الربط الرسمي عبر Meta': 'Manage the official Meta connection',
+  'الرسائل والتكلفة والتنبيهات': 'Messages, cost, and alerts',
+  'الباقة والحدود والاستخدام': 'Plan, limits, and usage',
+  'التحكم في وصول مدير المنصة': 'Control platform administrator access',
+  'اختر لوحة الألوان': 'Choose a color palette',
+  'الحساب': 'Account',
+  'التفضيلات': 'Preferences',
+  'المظهر والتخصيص': 'Appearance & personalization',
+  'الألوان والوضع الداكن واللغة': 'Colors, dark mode and language',
+  'حافظ على أمان حسابك': 'Keep your account secure',
+  'معلومات الحساب': 'Account information',
+  'البريد الإلكتروني': 'Email address',
+  'الدور والصلاحيات': 'Role & permissions',
+  'الصلاحيات المفعلة': 'Active permissions',
+  'لا توجد صلاحيات مخصصة لهذا الحساب.':
+      'No custom permissions are assigned to this account.',
+  'ادخل إلى دردشات عملائك وابدأ العمل مباشرة.':
+      'Open your customer conversations and start working right away.',
+  'اتصال آمن بمساحة عملك': 'Secure connection to your workspace',
+  'دردشات فريقك في مكان واحد': 'Your team conversations in one place',
+  'خدمة أسرع.\nتجربة أبسط.': 'Faster support.\nA simpler experience.',
+  'تابع الرسائل ورد على عملائك لحظيًا من تجربة مصممة للجوال.':
+      'Follow messages and reply in real time from a mobile-first experience.',
+  'صندوق رسائل فريقك': 'Your team inbox',
+  'متصل مباشرة': 'Live connection',
+  'ابحث في الدردشات': 'Search conversations',
+  'تعذر تحميل الدردشات': 'Could not load conversations',
+  'لا توجد دردشات مغلقة': 'No closed conversations',
+  'لا توجد دردشات هنا': 'No conversations here',
+  'الدردشات التي تستلمها ستظهر في هذا القسم.':
+      'Chats you take will appear in this section.',
+  'ستظهر الرسائل الجديدة هنا فور وصولها.':
+      'New messages will appear here as soon as they arrive.',
+  'مسندة لك': 'Assigned to you',
+  'م': 'PM',
+  'ص': 'AM',
+  'اكتب رسالة...': 'Write a message...',
+  'ابحث بالاسم أو رقم الهاتف': 'Search by name or phone number',
+  'تعذر تحميل العملاء': 'Could not load customers',
+  'لا يوجد عملاء': 'No customers yet',
+  'سيظهر العملاء هنا عند بدء الدردشات معهم.':
+      'Customers will appear here when conversations begin.',
+  'لم نجد عميلًا مطابقًا لبحثك.': 'No customer matches your search.',
+  'تعديل بيانات العميل': 'Edit customer details',
+  'التنبيهات': 'Notifications',
+  'الرسائل التي تحتاج انتباهك': 'Messages that need your attention',
+  'تعذر تحميل التنبيهات': 'Could not load notifications',
+  'لا توجد تنبيهات جديدة': 'No new notifications',
+  'أنت على اطلاع بكل الرسائل. ستظهر هنا الدردشات غير المقروءة.':
+      'You are all caught up. Unread conversations will appear here.',
+  'رسالة جديدة': 'New message',
+  'المزيد': 'More',
+  'عرض العميل': 'View customer',
+  'إسناد الدردشة': 'Assign conversation',
+  'تذكير': 'Reminder',
+  'إعادة فتح الدردشة': 'Reopen conversation',
+  'إغلاق الدردشة': 'Close conversation',
+  'تجاوز القفل': 'Override lock',
+  'الدردشة مغلقة': 'Chat closed',
+  'جاري تجهيز الدردشة للرد…': 'Preparing the conversation for reply…',
+  'هذه الدردشة مغلقة ويمكن عرض رسائلها دون تعديل.':
+      'This conversation is closed. Its messages remain available to view.',
+  'سبب الإغلاق — اختياري': 'Closure reason — optional',
+  'نمط الألوان': 'Color preset',
+  'Wasl الحالي': 'Current Wasl',
+  'تخصيص الألوان اختياريًا': 'Customize colors (optional)',
+  'تخصيص الألوان': 'Customize colors',
+  'إعادة الضبط': 'Reset',
+  'بحث': 'Search',
+  'تصفية': 'Filters',
+  'استخدم لونًا بصيغة #RRGGBB يوفر تباينًا واضحًا للنص.':
+      'Use a #RRGGBB color with readable text contrast.',
+  'النظام': 'System',
+  'اللغة': 'Language',
+  '+30 يوم': '+30 days',
+  '+365 يوم': '+365 days',
+  '+7 أيام': '+7 days',
+  '24 ساعة': '24 hours',
+  '3 أحرف على الأقل': 'At least 3 characters',
+  '30 يوم من الآن': '30 days from now',
+  '8 أحرف على الأقل': 'At least 8 characters',
+  'API Key صالح.': 'A valid API key.',
+  'API Key من لوحة YCloud.': 'An API key from the YCloud dashboard.',
+  'API Key — اتركه فارغًا للاحتفاظ بالحالي':
+      'API Key — leave blank to keep the current value',
+  'API Token — اتركه فارغًا للاحتفاظ بالحالي':
+      'API Token — leave blank to keep the current value',
+  'Access Token صالح وصلاحيات مناسبة.':
+      'A valid Access Token with the appropriate permissions.',
+  'Access Token — اتركه فارغًا للاحتفاظ بالحالي':
+      'Access Token — leave blank to keep the current value',
+  'Instance مفعل لدى GREEN-API.': 'An active Instance in GREEN-API.',
+  'Phone Number ID وWhatsApp Business Account ID.':
+      'Phone Number ID and WhatsApp Business Account ID.',
+  'QR ليس IPA ولا APK. المقصود API: رابط ومفتاح خادم الربط الذي يولّد رمز QR.':
+      'QR is not IPA or APK. The intended term is API: the URL and key of the bridge server that generates the QR code.',
+  'Wasl 2.0 — تسجيل دخول باسم مستخدم، عزل المتاجر، طرق واتساب مستقلة، وخصوصية دعم قابلة للتدقيق.':
+      'Wasl 2.0 — username sign-in, store isolation, independent WhatsApp methods, and auditable support privacy.',
+  'Wasl 2.1 — دردشات أسرع، تنبيهات للرسائل، وعزل آمن للمتاجر.':
+      'Wasl 2.1 — faster conversations, message alerts, and secure store isolation.',
+  'إضافة وسوم': 'Add tags',
+  'إدارة الردود السريعة': 'Manage quick replies',
+  'اختصار اختياري مثل /hello': 'Optional shortcut such as /hello',
+  'البحث داخل الدردشات والرسائل': 'Search conversations and messages',
+  'الردود السريعة': 'Quick replies',
+  'الردود السريعة والقوالب': 'Quick replies and templates',
+  'تذكير متابعة': 'Follow-up reminder',
+  'تفعيل إشعارات المتصفح': 'Enable browser notifications',
+  'تم تفعيل إشعارات المتصفح.': 'Browser notifications are enabled.',
+  'تم تفعيل إشعارات المتصفح للرسائل الجديدة.':
+      'Browser notifications are enabled for new messages.',
+  'تمت المتابعة': 'Follow-up completed',
+  'رد سريع جديد': 'New quick reply',
+  'غير المقروءة': 'Unread',
+  'فلترة بوسم': 'Filter by tag',
+  'متابعة مستحقة': 'Follow-up due',
+  'مسندة لي': 'Assigned to me',
+  'ملاحظة المتابعة': 'Follow-up note',
+  'وسوم الدردشة': 'Chat tags',
+  'Webhook Verify Token — اتركه فارغًا للاحتفاظ بالحالي':
+      'Webhook Verify Token — leave blank to keep the current value',
+  '، ': ', ',
+  'أحدث الدردشات': 'Latest conversations',
+  'أدخل اسم العميل': 'Enter the customer name',
+  'أدخل اسم مستخدم صالحًا': 'Enter a valid username',
+  'أدخل اسمًا صحيحًا': 'Enter a valid name',
+  'أدخل البيانات واحفظها.': 'Enter the details and save them.',
+  'أدخل الرقم والمفتاح في اللوحة واحفظ.':
+      'Enter the number and key in the dashboard, then save.',
+  'أدخل بريدًا صحيحًا': 'Enter a valid email',
+  'أدخل بريدًا صحيحًا أو اتركه فارغًا': 'Enter a valid email or leave it blank',
+  'أدخل رابط الخادم واسم الـInstance وAPI Key في اللوحة.':
+      'Enter the server URL, Instance name, and API key in the dashboard.',
+  'أدخل رابط خادم API واسم الـInstance ومفتاح API ثم احفظ الإعدادات.':
+      'Enter the API server URL, Instance name, and API key, then save the settings.',
+  'أدخل رقمًا صحيحًا': 'Enter a valid number',
+  'أدخل رقمًا صحيحًا 0 أو أكبر': 'Enter a valid number of 0 or greater',
+  'أدخل عنوانًا ومحتوى صحيحين.': 'Enter a valid title and content.',
+  'أدخل كلمة المرور': 'Enter the password',
+  'أدخلها واحفظ.': 'Enter the details and save.',
+  'أدخلهما في اللوحة واحفظ.': 'Enter both values in the dashboard and save.',
+  'أضف Webhook URL لدى المزود.':
+      'Add the Webhook URL in the provider dashboard.',
+  'أضف سياسات الشحن والاسترجاع والأسئلة المتكررة.':
+      'Add shipping, return, and frequently asked question policies.',
+  'أضفهما في إعداد Webhooks لدى Meta واشترك في أحداث الرسائل.':
+      'Add both values in Meta Webhooks settings and subscribe to message events.',
+  'أنشئ Instance في Evolution API.': 'Create an Instance in Evolution API.',
+  'أول رسالة': 'First message',
+  'إحصائيات المنصة': 'Platform statistics',
+  'إدارة الحالة والأولوية': 'Manage status and priority',
+  'إدارة الحساب': 'Manage account',
+  'إدارة المتاجر': 'Manage stores',
+  'إدارة واتساب': 'Manage WhatsApp',
+  'إدارة المنصة': 'Platform management',
+  'إدارة الموظفين': 'Manage employees',
+  'إدارة دردشات واتساب وفريق الدعم من مكان واحد':
+      'Manage WhatsApp conversations and your support team in one place',
+  'إرسال': 'Send',
+  'إرسال الردود وإضافة الملاحظات الداخلية.':
+      'Send replies and add internal notes.',
+  'إسناد الدردشات لفريق الدعم.': 'Assign conversations to the support team.',
+  'إضافة': 'Add',
+  'إضافة العملاء': 'Add customers',
+  'إضافة عميل': 'Add customer',
+  'إضافة معلومة': 'Add information',
+  'إضافة موظف': 'Add employee',
+  'إعادة المحاولة': 'Try again',
+  'إعادة تفعيل الموظف': 'Reactivate employee',
+  'إعداد': 'Configure',
+  'إعداد Webhook عند استقبال الرسائل.':
+      'Webhook configuration when receiving messages.',
+  'إعداد Webhook لاستقبال الرسائل الواردة والحالات.':
+      'A Webhook configuration for incoming messages and status updates.',
+  'إعدادات المساعد': 'Assistant settings',
+  'إغلاق': 'Close',
+  'إغلاق الدردشات وتغيير حالتها وأولويتها.':
+      'Close conversations and change their status and priority.',
+  'إلغاء': 'Cancel',
+  'إلغاء وصول الدعم الآن': 'Revoke support access now',
+  'إنشاء': 'Create',
+  'إنشاء الدردشات تلقائيًا من Webhook':
+      'Automatically create conversations from the Webhook',
+  'إنشاء سجلات عملاء جديدة.': 'Create new customer records.',
+  'إنشاء متجر جديد': 'Create new store',
+  'إنشاء دردشات يدوية': 'Create manual conversations',
+  'إنشاء دردشة يدوية': 'Create manual conversation',
+  'إنشاء مسودة رد من المساعد.': 'Create a reply draft using the assistant.',
+  'إنشاء وإدارة المتاجر وأصحابها': 'Create and manage stores and their owners',
+  'إنهاء الجلسة': 'End session',
+  'إيقاف الموظف': 'Suspend employee',
+  'ابدأ به مغلقًا حتى تراجع قاعدة المعرفة.':
+      'Keep this off until you review the knowledge base.',
+  'اترك القيمة الافتراضية ما لم يطلب منك مزود Meta تغييرها.':
+      'Keep the default value unless Meta asks you to change it.',
+  'احصل على بيانات الربط من المزود.':
+      'Get the connection credentials from the provider.',
+  'احفظ API Key بسرية.': 'Keep the API key secret.',
+  'احفظ الإعدادات ثم انسخ Webhook URL وVerify Token الظاهرين في اللوحة.':
+      'Save the settings, then copy the Webhook URL and Verify Token shown in the dashboard.',
+  'احفظ وفعّل الطريقة، ثم اضغط زر QR.':
+      'Save and enable the method, then press the QR button.',
+  'اختبار': 'Test',
+  'اختبر الاتصال، ثم انسخ Webhook URL إلى إعدادات Evolution إن لم يكن مضافًا تلقائيًا.':
+      'Test the connection, then copy the Webhook URL into Evolution settings if it was not added automatically.',
+  'اختر تاريخ نهاية مستقبليًا.': 'Choose a future end date.',
+  'اختر دردشة من القائمة': 'Select a conversation from the list',
+  'اختر مزودًا واحدًا كافتراضي. لا توجد رسائل تجريبية وهمية: الإرسال الحقيقي يبدأ فقط بعد حفظ الإعدادات، اختبار الاتصال، وتفعيل الطريقة.':
+      'Choose one provider as the default. There are no fake demo messages: live sending starts only after saving the settings, testing the connection, and enabling the method.',
+  'اختيار تاريخ': 'Choose date',
+  'استجابة الخادم غير متوقعة.': 'Unexpected server response.',
+  'استخدامها كطريقة الإرسال الافتراضية': 'Use as the default sending method',
+  'اسم Instance فريد لهذا المتجر.': 'A unique Instance name for this store.',
+  'اسم Instance منفصل لكل رقم أو متجر.':
+      'A separate Instance name for each number or store.',
+  'اسم اختياري لهذا الربط': 'Optional name for this connection',
+  'اسم الجلسة أو الـInstance الذي أنشأته لدى مزود الربط.':
+      'The session or Instance name you created with the connection provider.',
+  'اسم العميل': 'Customer name',
+  'اسم المتجر': 'Store name',
+  'اسم المستخدم': 'Username',
+  'اسم المستخدم الجديد': 'New username',
+  'اسم المستخدم مستخدم مسبقًا.': 'The username is already in use.',
+  'اسم المستخدم وكلمة المرور': 'Username and password',
+  'اسم الموظف': 'Employee name',
+  'اسم النموذج': 'Model name',
+  'اسم صاحب المتجر': 'Store owner name',
+  'اسم مخصص للخطة': 'Custom plan name',
+  'اسم مستخدم صاحب المتجر': 'Store owner username',
+  'اشتراكات المتاجر': 'Store subscriptions',
+  'اضبط Webhook URL لدى المزود.':
+      'Configure the Webhook URL with the provider.',
+  'اضغط «اختبار» للتأكد من أن الجلسة تعمل.':
+      'Press “Test” to make sure the session works.',
+  'افتح WhatsApp Manager في Meta وحدد الرقم التجاري.':
+      'Open WhatsApp Manager in Meta and select the business number.',
+  'اقبل تحذير المخاطر أولًا.': 'Accept the risk warning first.',
+  'اقتراح رد بالذكاء الاصطناعي': 'Suggest an AI reply',
+  'اقتراحات الذكاء الاصطناعي': 'AI suggestions',
+  'اكتب الرد هنا...': 'Write your reply here...',
+  'اكتب الرسالة': 'Write the message',
+  'اكتب الرقم بصيغة دولية، مثال: 9665XXXXXXXX، من دون علامة + أو مسافات.':
+      'Enter the number in international format, for example 9665XXXXXXXX, without + or spaces.',
+  'الأرقام وحالة العمل': 'Work metrics and status',
+  'الأرقام وحالة المنصة': 'Platform metrics and status',
+  'الأعمال التي تحتاج استقرارًا أعلى، قوالب رسائل، وربطًا رسميًا طويل المدى.':
+      'Businesses that need greater stability, message templates, and a long-term official connection.',
+  'الأكثر استقرارًا ومناسبة للأعمال': 'Most stable and suitable for businesses',
+  'الأولوية': 'Priority',
+  'الإحصائيات': 'Analytics',
+  'الإحصائيات والتقارير': 'Analytics and reports',
+  'الاسم': 'Name',
+  'الاشتراك': 'Subscription',
+  'الاشتراك غير نشط. راجع إدارة المنصة.':
+      'The subscription is inactive. Contact the platform administrator.',
+  'الاشتراك والاستخدام': 'Subscription and usage',
+  'الاشتراكات': 'Subscriptions',
+  'الباقات والحدود والمزايا': 'Plans, limits, and features',
+  'البريد الإلكتروني (اختياري)': 'Email (optional)',
+  'البريد الإلكتروني مستخدم مسبقًا.': 'The email address is already in use.',
+  'البريد الإلكتروني — اختياري': 'Email — optional',
+  'البيانات والوسوم والملاحظات': 'Customer data, tags, and notes',
+  'التأكيد غير مطابق': 'Confirmation does not match',
+  'التجربة السريعة والمتاجر الصغيرة التي تقبل أن الربط غير رسمي وقد يحتاج إعادة مسح QR.':
+      'Quick trials and small stores that accept an unofficial connection which may require scanning the QR code again.',
+  'الجلسة غير صالحة.': 'The session is invalid.',
+  'الحالة': 'Status',
+  'الحالة: موقوف': 'Status: Suspended',
+  'الحالة: نشط': 'Status: Active',
+  'الحدود والاستخدام': 'Limits and usage',
+  'الحساب غير مرتبط بمتجر.': 'This account is not linked to a store.',
+  'الخدمة ورسومها واستقرارها مسؤولية المزود الخارجي.':
+      'The service, pricing, and stability are the responsibility of the external provider.',
+  'الخطة': 'Plan',
+  'الخطة المجانية': 'Free plan',
+  'الدور': 'Role',
+  'الذكاء الاصطناعي': 'AI',
+  'الذكاء الاصطناعي وقاعدة المعرفة': 'AI and knowledge base',
+  'الرابط الأساسي لخادم المزود، ويجب أن يبدأ بـ http:// أو https://.':
+      'The provider server base URL. It must start with http:// or https://.',
+  'الرابط المعروض يتضمن رمز حماية؛ انسخه كاملًا إلى إعداد Webhook لدى المزود.':
+      'The displayed URL includes a security token; copy it in full into the provider\'s Webhook settings.',
+  'الربط الرسمي المباشر مع منصة واتساب للأعمال من Meta.':
+      'Official direct connection to the Meta WhatsApp Business Platform.',
+  'الربط الرسمي من Meta عبر WhatsApp Cloud API. لا يستخدم QR.':
+      'The official Meta connection through WhatsApp Cloud API. It does not use a QR code.',
+  'الربط السهل عبر QR': 'Easy QR connection',
+  'الرد التلقائي على الرسائل الواردة':
+      'Automatically reply to incoming messages',
+  'الرد على العملاء': 'Reply to customers',
+  'الرد والتوزيع والمتابعة': 'Reply, assign, and follow up',
+  'الرسائل': 'Messages',
+  'الرسائل المستخدمة': 'Messages used',
+  'الصلاحيات': 'Permissions',
+  'الصلاحيات الفعلية': 'Effective permissions',
+  'الطرق الرسمية': 'Official methods',
+  'العملاء': 'Customers',
+  'العميل': 'Customer',
+  'العميل غير موجود داخل هذا المتجر.':
+      'The customer was not found in this store.',
+  'العنوان': 'Title',
+  'الفريق والصلاحيات': 'Team and permissions',
+  'المتاجر': 'Stores',
+  'المتاجر التي لديها حساب جاهز لدى هذا المزود.':
+      'Stores that already have an account with this provider.',
+  'المتاجر النشطة': 'Active stores',
+  'المتجر غير موجود أو موقوف.': 'The store was not found or is suspended.',
+  'المتجر غير موجود.': 'Store not found.',
+  'الدردشات': 'Chats',
+  'الدردشات المفتوحة': 'Open conversations',
+  'الدردشات اليدوية': 'Manual conversations',
+  'الدردشات خاصة': 'Chats are private',
+  'الدردشة': 'Chat',
+  'الدردشة غير موجودة داخل هذا المتجر.':
+      'The conversation was not found in this store.',
+  'المحتوى الدقيق الذي سيستخدمه المساعد':
+      'Accurate content the assistant will use',
+  'المدة': 'Duration',
+  'المدة والاستخدام': 'Period and usage',
+  'المزايا المتاحة للمتجر': 'Features available to the store',
+  'المزود': 'Provider',
+  'المزود وقاعدة المعرفة': 'Provider and knowledge base',
+  'المستخدمون': 'Users',
+  'المعرّف الإنجليزي (اختياري)': 'English identifier (optional)',
+  'المغلقة': 'Closed',
+  'الموظف': 'Agent',
+  'الموظف المسؤول': 'Assigned agent',
+  'الموظفون': 'Employees',
+  'الهوية وبيانات التوصل': 'Identity and contact details',
+  'الوسوم مفصولة بفاصلة': 'Tags separated by commas',
+  'الوصول المؤقت مفعّل': 'Temporary access enabled',
+  'الوصول غير مسموح': 'Access not allowed',
+  'امسح QR من «الأجهزة المرتبطة» في واتساب.':
+      'Scan the QR code from “Linked devices” in WhatsApp.',
+  'امسح QR من تطبيق واتساب': 'Scan the QR code from WhatsApp',
+  'امسح رمز QR الظاهر في اللوحة وانتظر حتى تصبح الحالة «متصل».':
+      'Scan the QR code shown in the dashboard and wait until the status becomes “Connected”.',
+  'انتظار': 'Waiting',
+  'انتهت مدة الاشتراك. راجع إدارة المنصة.':
+      'The subscription has expired. Contact the platform administrator.',
+  'انسخ Instance ID وToken من UltraMsg.':
+      'Copy the Instance ID and Token from UltraMsg.',
+  'انسخ Phone Number ID وWABA ID وAccess Token إلى الحقول المقابلة.':
+      'Copy the Phone Number ID, WABA ID, and Access Token into the matching fields.',
+  'انسخ Webhook URL إلى إعدادات Webhook في YCloud.':
+      'Copy the Webhook URL into the Webhook settings in YCloud.',
+  'انسخ بيانات الـInstance من لوحة GREEN-API.':
+      'Copy the Instance details from the GREEN-API dashboard.',
+  'بالانتظار': 'Pending',
+  'بانتظار الرد': 'Waiting for reply',
+  'بحث باسم العميل أو الرقم': 'Search by customer name or number',
+  'بحث بالاسم أو الرقم أو البريد': 'Search by name, number, or email',
+  'بدء الجلسة': 'Start session',
+  'بدء جلسة دعم خاصة': 'Start private support session',
+  'بدء دردشة يدوية جديدة': 'Start a new manual conversation',
+  'بدون رسائل': 'No messages',
+  'بدون صلاحيات تشغيلية': 'No operational permissions',
+  'بريد المتجر': 'Store email',
+  'بريد المتجر (اختياري)': 'Store email (optional)',
+  'بريد صاحب المتجر (اختياري)': 'Store owner email (optional)',
+  'بقاء الهاتف والخادم متصلين بالإنترنت أثناء إنشاء الجلسة.':
+      'Keep the phone and server connected to the internet while creating the session.',
+  'بيانات API المطلوبة.': 'The required API credentials.',
+  'بيانات الدخول والصلاحيات': 'Sign-in details and permissions',
+  'بيانات المتجر': 'Store profile',
+  'تأكيد': 'Confirm',
+  'تأكيد كلمة المرور': 'Confirm password',
+  'تأمين الحساب': 'Secure account',
+  'تجده في WhatsApp Manager داخل إعدادات API لدى Meta.':
+      'You can find it in WhatsApp Manager under Meta API settings.',
+  'تجديد الفترة تلقائيًا بنفس مدتها':
+      'Automatically renew the period for the same duration',
+  'تجريبية': 'Trial',
+  'تحديث': 'Refresh',
+  'تحقق من طول كلمة المرور وتطابق التأكيد.':
+      'Check the password length and make sure the confirmation matches.',
+  'تحكم كامل': 'Full control',
+  'تحكم مؤقت في وصول مدير المنصة':
+      'Temporary control of platform administrator access',
+  'تسجيل الخروج': 'Sign out',
+  'تسجيل الدخول': 'Sign in',
+  'تصفير عداد الرسائل عند الحفظ': 'Reset the message counter when saving',
+  'تعديل': 'Edit',
+  'تعديل اشتراك متجر': 'Edit store subscription',
+  'تعديل البيانات والصلاحيات': 'Edit details and permissions',
+  'تعديل البيانات والوسوم والملاحظات.': 'Edit data, tags, and notes.',
+  'تعديل العملاء': 'Edit customers',
+  'تعديل العميل': 'Edit customer',
+  'تعديل المعلومة': 'Edit information',
+  'تعديل الموظف': 'Edit employee',
+  'تعذر استعادة جلسة مدير المنصة.':
+      'Could not restore the platform administrator session.',
+  'تعذر الاتصال بالخادم. تأكد أن Docker والـAPI شغالان.':
+      'Could not connect to the server. Make sure Docker and the API are running.',
+  'تعذر التغيير.': 'Change failed.',
+  'تعذر تحميل مزايا الاشتراك': 'Could not load subscription entitlements',
+  'تعليمات المساعد': 'Assistant instructions',
+  'تغيير اسم المستخدم': 'Change username',
+  'تغيير كلمة المرور': 'Change password',
+  'تغيير كلمة مرور المالك': 'Change owner password',
+  'تغيير كلمة مرور صاحب المتجر': 'Change store owner password',
+  'تفعيل المساعد': 'Enable assistant',
+  'تفعيل هذه الطريقة': 'Enable this method',
+  'تم': 'OK',
+  'تم إنشاء المتجر وصاحب المتجر.': 'The store and its owner were created.',
+  'تم إيقاف المتجر.': 'Store suspended.',
+  'تم اختبار الاتصال': 'Connection test successful',
+  'تم التسليم': 'Delivered',
+  'تم تحديث العميل.': 'Customer updated.',
+  'تم تحديث الموظف.': 'Employee updated.',
+  'تم تغيير اسم المستخدم.': 'Username changed.',
+  'تم تغيير كلمة المرور.': 'Password changed.',
+  'تم تغيير كلمة مرور صاحب المتجر وتفعيل حسابه.':
+      'The store owner password was changed and the account was activated.',
+  'تم تفعيل المتجر.': 'Store activated.',
+  'تم حذف المتجر وجميع بياناته نهائيًا.':
+      'The store and all its data were permanently deleted.',
+  'تم حفظ إعدادات المساعد.': 'Assistant settings saved.',
+  'تم حفظ إعدادات طريقة الربط.': 'Connection settings saved.',
+  'تم حفظ الاشتراك والحدود بنجاح.':
+      'Subscription and limits saved successfully.',
+  'تم حفظ بيانات المتجر.': 'Store details saved.',
+  'تمت إضافة العميل.': 'Customer added.',
+  'تمت إضافة الموظف.': 'Employee added.',
+  'توزيع الدردشات': 'Assign conversations',
+  'جاري الربط': 'Connecting',
+  'جديدة': 'New',
+  'حتى ألغيها بنفسي': 'Until I revoke it',
+  'حتى يتم الإلغاء': 'Until revoked',
+  'حد الموظفين': 'Employee limit',
+  'حد الموظفين (0 غير محدود)': 'Employee limit (0 = unlimited)',
+  'حد رسائل الفترة (0 غير محدود)': 'Period message limit (0 = unlimited)',
+  'حد عناصر المعرفة (0 غير محدود)': 'Knowledge item limit (0 = unlimited)',
+  'حدث خطأ في الاتصال بالخادم.': 'A server connection error occurred.',
+  'حذف': 'Delete',
+  'حذف المتجر نهائيًا': 'Permanently delete store',
+  'حذف المعلومة': 'Delete information',
+  'حذف متجر نهائيًا': 'Permanently delete store',
+  'حذف نهائي': 'Delete permanently',
+  'حساب Meta Business وحساب WhatsApp Business Platform.':
+      'A Meta Business account and a WhatsApp Business Platform account.',
+  'حساب YCloud نشط.': 'An active YCloud account.',
+  'حساب نشط لدى المزود.': 'An active provider account.',
+  'حساب ورقم مربوطان داخل UltraMsg.':
+      'An account and number connected inside UltraMsg.',
+  'حسابي': 'My account',
+  'حسابي وصلاحياتي': 'My account and permissions',
+  'حسب النظام': 'Use system setting',
+  'حفظ': 'Save',
+  'حفظ الإعدادات': 'Save settings',
+  'حفظ الاشتراك': 'Save subscription',
+  'حفظ البيانات بالأيام (0 دائم)': 'Data retention in days (0 = forever)',
+  'حفظ التغييرات': 'Save changes',
+  'حفظ كلمة المرور': 'Save password',
+  'حفظ والمتابعة': 'Save and continue',
+  'خادم Evolution API مُثبت ويعمل عبر HTTPS.':
+      'An Evolution API server installed and available over HTTPS.',
+  'خادم WhatsApp Web / Evolution متاح وله رابط API ومفتاح API.':
+      'An available WhatsApp Web / Evolution server with an API URL and API key.',
+  'خادم مستقل يدعم إنشاء Instance ومسح QR وإرسال الرسائل.':
+      'An independent server that supports Instance creation, QR scanning, and message sending.',
+  'خصوصية الدعم': 'Support privacy',
+  'خصوصية دعم المنصة': 'Platform support privacy',
+  'خطأ': 'Error',
+  'خطط تدعم AI': 'Plans with AI',
+  'خطوات الربط': 'Connection steps',
+  'خيارات المتجر': 'Store options',
+  'داكن': 'Dark',
+  'رابط خادم API': 'API server URL',
+  'رابط خادم API مثل https://wa.example.com':
+      'API server URL, for example https://wa.example.com',
+  'رابط خادم API يجب أن يبدأ بـ http:// أو https://':
+      'The API server URL must start with http:// or https://',
+  'راجع حدود الإرسال وسياسة الاستخدام لدى المزود.':
+      'Review the provider\'s sending limits and acceptable-use policy.',
+  'ربط سريع بمسح QR عبر جسر خارجي متوافق مع Evolution API.':
+      'Quick QR connection through an external bridge compatible with Evolution API.',
+  'ربط عبر Instance ID وAPI Token لدى Green API.':
+      'Connect using a Green API Instance ID and API Token.',
+  'ربط عبر حساب Instance وToken لدى UltraMSG.':
+      'Connect using an UltraMSG Instance and Token.',
+  'ربط واتساب': 'Connect WhatsApp',
+  'ربط واتساب الحقيقي': 'Live WhatsApp connection',
+  'رسائل الفترة الحالية': 'Current-period messages',
+  'رسائل الوسائط': 'Media messages',
+  'رسائل اليوم': 'Messages today',
+  'رسمي، QR، ومزودات مستقلة': 'Official, QR, and independent providers',
+  'رقم العميل موجود مسبقًا داخل هذا المتجر.':
+      'The customer number already exists in this store.',
+  'رقم الهاتف': 'Phone number',
+  'رقم الهاتف غير صالح.': 'The phone number is invalid.',
+  'رقم غير صالح': 'Invalid number',
+  'رقم هاتف مضاف ومتحقق منه لدى Meta.':
+      'A phone number added and verified with Meta.',
+  'رقم واتساب التجاري': 'Business WhatsApp number',
+  'رقم واتساب معتمد لدى المزود.': 'A WhatsApp number approved by the provider.',
+  'رمز API تحصل عليه من لوحة المزود.':
+      'The API token provided in the provider dashboard.',
+  'رمز وصول Meta. لا تشاركه خارج لوحة الإدارة.':
+      'Meta access token. Do not share it outside the administration panel.',
+  'ساعة واحدة': 'One hour',
+  'سبب الدخول': 'Reason for access',
+  'سبب الدعم (اختياري)': 'Support reason (optional)',
+  'سجل التدقيق': 'Audit log',
+  'سجل عمليات الإدارة': 'Administration audit log',
+  'سريع، لكنه غير رسمي وقد يحتاج إعادة ربط':
+      'Fast, but unofficial and may need reconnection',
+  'سيتم إيقاف هذه الطريقة ولن تُرسل الرسائل من خلالها.':
+      'This method will be disabled and messages will no longer be sent through it.',
+  'سيتم تسجيل وقت الجلسة وسببها وكل دردشة تُفتح أثناءها.':
+      'The session time, reason, and every conversation opened during it will be logged.',
+  'سيتمكن الموظف من تسجيل الدخول من جديد.':
+      'The employee will be able to sign in again.',
+  'شرح المتطلبات وخطوات الربط': 'Requirements and connection steps',
+  'صاحب المتجر': 'Store owner',
+  'صاحب المتجر لم يمنح مدير المنصة صلاحية مؤقتة لقراءة الدردشات. يمكن إدارة المتجر، لكن لا يمكن دخول جلسة الدعم الخاصة.':
+      'The store owner has not granted the platform administrator temporary access to read conversations. You can manage the store, but you cannot enter its private support session.',
+  'صندوق الدردشات': 'Chat inbox',
+  'ضع هذا الرمز في إعداد Verify Token داخل Meta.':
+      'Enter this value as the Verify Token in Meta.',
+  'طرق ربط واتساب': 'WhatsApp connection methods',
+  'طريقة الربط': 'Connection guide',
+  'طريقة ربط مستقلة تحتاج بيانات من لوحة المزود.':
+      'An independent connection method that requires details from the provider dashboard.',
+  'عاجلة': 'Urgent',
+  'عادية': 'Normal',
+  'عالية': 'High',
+  'عدد رسائل السياق:': 'Context messages:',
+  'عرض QR': 'Show QR',
+  'عرض بيانات العملاء داخل المتجر.': 'View customer data in the store.',
+  'عرض نظرة عامة على أداء المتجر.': 'View an overview of store performance.',
+  'عمليات الإدارة وجلسات الدعم': 'Administrative actions and support sessions',
+  'عملية إدارية': 'Administrative action',
+  'عميل': 'Customer',
+  'عميل جديد': 'New customer',
+  'غير محدود': 'Unlimited',
+  'غير مسندة': 'Unassigned',
+  'غير مفعّل': 'Disabled',
+  'غير مقروءة': 'Unread',
+  'غيّر كلمة المرور الافتراضية': 'Change the default password',
+  'فاتح': 'Light',
+  'فتح صندوق الدردشات.': 'Open the conversation inbox.',
+  'فحص وصيانة بطلب صاحب المتجر':
+      'Inspection and maintenance requested by the store owner',
+  'فشلت': 'Failed',
+  'فصل': 'Disconnect',
+  'فصل الربط؟': 'Disconnect?',
+  'فعّل الطريقة ثم اختبر الاتصال.':
+      'Enable the method, then test the connection.',
+  'فعّل الطريقة واختبر الاتصال.': 'Enable the method and test the connection.',
+  'فعّل الطريقة واضغط «اختبار».': 'Enable the method and press “Test”.',
+  'فعّل الطريقة واضغط زر QR الظاهر في بطاقة الربط.':
+      'Enable the method and press the QR button on the connection card.',
+  'فعّل واختبر الاتصال.': 'Enable the method and test the connection.',
+  'فهمت': 'Got it',
+  'في التشغيل المحلي الأول فقط: admin / admin — سيطلب النظام تغيير كلمة المرور مباشرة. في الإنتاج استخدم بيانات BOOTSTRAP_ADMIN_*.':
+      'For the first local run only: admin / admin — the system will require an immediate password change. In production, use the BOOTSTRAP_ADMIN_* values.',
+  'قاعدة المعرفة': 'Knowledge base',
+  'قد تتطلب الرسائل التي تبدأها الشركة قوالب معتمدة ورسومًا من Meta.':
+      'Business-initiated messages may require approved templates and Meta fees.',
+  'قد تكون هناك رسوم مستقلة لدى YCloud إضافة إلى رسوم واتساب.':
+      'YCloud may charge separate fees in addition to WhatsApp fees.',
+  'قد تنتهي الجلسة إذا سُجّل خروج الرقم أو توقف خادم الربط.':
+      'The session may expire if the number is signed out or the bridge server stops.',
+  'قرأت التحذير وأقبل مخاطر الطريقة غير الرسمية/الخارجية':
+      'I have read the warning and accept the risks of this unofficial/third-party method',
+  'كل الحالات': 'All statuses',
+  'كل طريقة ربط مستقلة': 'Each connection method is independent',
+  'كل قراءة للدردشات مسجلة. اخرج عند انتهاء الصيانة.':
+      'Every conversation view is logged. Exit when maintenance is complete.',
+  'كل مزود مستقل بإعداداته واشتراكه':
+      'Each provider has its own settings and subscription',
+  'كلمات التحويل لموظف — مفصولة بفاصلة':
+      'Handoff keywords — separated by commas',
+  'كلمة المرور': 'Password',
+  'كلمة المرور الجديدة': 'New password',
+  'كلمة المرور الحالية': 'Current password',
+  'كلمة المرور المؤقتة': 'Temporary password',
+  'كلمة المرور يجب أن تكون 8 أحرف على الأقل.':
+      'The password must be at least 8 characters.',
+  'كلمة سر تختارها للتحقق من Webhook، ويجب أن تطابق إعداد المزود.':
+      'A password you choose to verify the Webhook. It must match the provider setting.',
+  'كلمتا المرور غير متطابقتين.': 'The two passwords do not match.',
+  'كيف تعمل الحماية؟': 'How does protection work?',
+  'لا تستخدم Instance واحدًا لأكثر من متجر.':
+      'Do not use the same Instance for more than one store.',
+  'لا تشارك مفاتيح API مع أي شخص غير مخول.':
+      'Do not share API keys with anyone who is not authorized.',
+  'لا تغلق خادم الجسر أثناء الربط. قد تحتاج لإعادة المسح إذا انتهت الجلسة.':
+      'Do not stop the bridge server while connecting. You may need to scan again if the session expires.',
+  'لا توجد صلاحيات تشغيلية مخصصة لهذا الحساب.':
+      'No operational permissions are assigned to this account.',
+  'لا توجد طريقة واتساب مفعلة لهذا المتجر.':
+      'No WhatsApp method is enabled for this store.',
+  'لا توجد عمليات مسجلة حتى الآن.': 'No operations have been recorded yet.',
+  'لا توجد متاجر حتى الآن.': 'No stores yet.',
+  'لا توجد دردشات حتى الآن.': 'No conversations yet.',
+  'لا توجد دردشات مطابقة.': 'No matching conversations.',
+  'لا يوجد QR في هذه الطريقة.': 'This method does not use a QR code.',
+  'لا يوجد حساب مالك مرتبط بهذا المتجر.':
+      'No owner account is linked to this store.',
+  'لا يوجد عملاء.': 'No customers found.',
+  'لمن تناسب؟': 'Who is it for?',
+  'لن تظهر بقية لوحة التحكم قبل تعيين كلمة مرور قوية خاصة بك.':
+      'The rest of the dashboard will remain unavailable until you set a strong password.',
+  'لن يتمكن الموظف من تسجيل الدخول حتى تعيد تفعيله.':
+      'The employee will not be able to sign in until you reactivate them.',
+  'ما أضفت موظفين حتى الآن.': 'You have not added any employees yet.',
+  'ما المطلوب؟': 'What is required?',
+  'متجر جديد': 'New store',
+  'متصل': 'Connected',
+  'دردشة يدوية جديدة': 'New manual conversation',
+  'محلي تجريبي — بدون تكلفة': 'Local demo — no cost',
+  'مدير المتجر': 'Store administrator',
+  'مدير المنصة': 'Platform administrator',
+  'مدير المنصة لا يستطيع قراءة دردشات المتجر.':
+      'The platform administrator cannot read store conversations.',
+  'مدير متجر': 'Store administrator',
+  'مديرون ومشرفون وموظفون': 'Administrators, supervisors, and agents',
+  'مرسلة': 'Sent',
+  'مزود خارجي يعتمد على Instance وAPI Token.':
+      'A third-party provider that uses an Instance and API Token.',
+  'مزود خارجي يوفر Instance وToken للربط.':
+      'A third-party provider that supplies an Instance and Token for the connection.',
+  'مزود خارجي؛ الاستقرار والسياسات والتكلفة تعتمد على المزود.':
+      'Third-party provider; stability, policies, and pricing depend on the provider.',
+  'مزود خارجي؛ راجع سياسة المزود واحتمالات فصل الجلسة قبل استخدام رقم أساسي.':
+      'Third-party provider; review its policy and possible session disconnections before using a primary number.',
+  'مزود رسمي مبني على WhatsApp Cloud API مع إعدادات Webhook مستقلة.':
+      'An official provider based on WhatsApp Cloud API with independent Webhook settings.',
+  'مزود رسمي وسيط يسهّل استخدام WhatsApp Business API من خلال حساب YCloud.':
+      'An official intermediary provider that simplifies WhatsApp Business API through a YCloud account.',
+  'مزود مستقل يدير جلسة واتساب ويعرض QR من خلال Evolution API.':
+      'An independent provider that manages a WhatsApp session and displays a QR code through Evolution API.',
+  'مزودات خارجية': 'Third-party providers',
+  'مساحة العمل': 'Workspace',
+  'مستلمة': 'Received',
+  'مشاهدة التقارير': 'View reports',
+  'مشاهدة العملاء': 'View customers',
+  'مشاهدة الدردشات': 'View conversations',
+  'مشرف': 'Supervisor',
+  'مطلوبة': 'Required',
+  'معرّف المتجر': 'Store identifier',
+  'معرّف حساب واتساب التجاري WABA داخل Meta Business Manager.':
+      'The WhatsApp Business Account (WABA) ID in Meta Business Manager.',
+  'مغلقة': 'Closed',
+  'مفتاح API تحصل عليه من لوحة المزود.':
+      'The API key provided in the provider dashboard.',
+  'مفتوحة': 'Open',
+  'مفعّل': 'Enabled',
+  'مقروءة': 'Read',
+  'ملاحظات': 'Notes',
+  'ملاحظات الإدارة الداخلية': 'Internal administration notes',
+  'ملاحظات مهمة': 'Important notes',
+  'ملاحظة داخلية': 'Internal note',
+  'ملغية': 'Cancelled',
+  'من الهاتف افتح واتساب ← الإعدادات أو القائمة ← الأجهزة المرتبطة ← ربط جهاز.':
+      'On the phone, open WhatsApp ← Settings or Menu ← Linked devices ← Link a device.',
+  'من لديه حساب UltraMsg قائم ويريد ربطه بسرعة.':
+      'Anyone who already has an UltraMsg account and wants to connect it quickly.',
+  'من لوحة YCloud انسخ API Key وحدد رقم واتساب المربوط.':
+      'In the YCloud dashboard, copy the API key and select the connected WhatsApp number.',
+  'من يريد QR مع تحكم تقني كامل في الخادم والجلسات.':
+      'Anyone who wants QR connection with full technical control of the server and sessions.',
+  'من يستخدم GREEN-API بالفعل.': 'Anyone who already uses GREEN-API.',
+  'من يفضّل لوحة مزود جاهزة بدل إدارة إعدادات Meta مباشرة.':
+      'Anyone who prefers a ready-made provider dashboard instead of managing Meta settings directly.',
+  'منتهية/متأخرة': 'Past due',
+  'منح صلاحية دعم مؤقتة': 'Grant temporary support permission',
+  'منح وصول مؤقت للدعم': 'Grant temporary support access',
+  'منخفضة': 'Low',
+  'موافقة': 'Approve',
+  'موظف دعم': 'Support agent',
+  'موقوف': 'Suspended',
+  'نشط': 'Active',
+  'نشطة': 'Active',
+  'نظرة عامة': 'Overview',
+  'هاتف المتجر (اختياري)': 'Store phone (optional)',
+  'هاتف عليه تطبيق واتساب أو واتساب للأعمال.':
+      'A phone with WhatsApp or WhatsApp Business installed.',
+  'هذا الحقل مطلوب': 'This field is required',
+  'هذا المزود لا يدعم QR من داخل النظام.':
+      'This provider does not support QR inside the system.',
+  'هذه الطريقة تعتمد غالبًا على WhatsApp Web وليست واجهة Meta الرسمية؛ قد تتغير أو تتوقف أو تسبب تقييد الرقم.':
+      'This method usually relies on WhatsApp Web rather than the official Meta API; it may change, stop, or cause number restrictions.',
+  'هذه الطريقة غير رسمية وقد تنقطع الجلسة أو يتعرض الرقم للتقييد أو الحظر. استخدم رقمًا مخصصًا وبعد قبول المخاطر.':
+      'This method is unofficial. The session may disconnect or the number may be restricted or banned. Use a dedicated number and accept the risks first.',
+  'هذه الطريقة غير رسمية؛ استخدم Meta Cloud API عندما تحتاج أعلى استقرار والتزام رسمي.':
+      'This method is unofficial. Use Meta Cloud API when you need maximum stability and official compliance.',
+  'هذه الملاحظة لا تُرسل للعميل.': 'This note is not sent to the customer.',
+  'واتساب': 'WhatsApp',
+  'يجب قبول تحذير المخاطر قبل تفعيل هذه الطريقة.':
+      'You must accept the risk warning before enabling this method.',
+  'بيانات الدخول والدور والصلاحيات الفعلية':
+      'Sign-in details, role, and effective permissions',
+  'إعداد المساعد وقاعدة المعرفة وسياسة التحويل للموظف':
+      'Configure the assistant, knowledge base, and agent handoff policy',
+  'تتبّع عمليات الإدارة والتغييرات الحساسة زمنيًا':
+      'Track administrative actions and sensitive changes over time',
+  'عيّن كلمة مرور قوية قبل متابعة استخدام النظام':
+      'Set a strong password before continuing',
+  'مرحبًا بعودتك': 'Welcome back',
+  'سجّل الدخول للوصول إلى مساحة عملك ودردشات العملاء.':
+      'Sign in to access your workspace and customer conversations.',
+  'دخول مساحة العمل': 'Enter workspace',
+  'منصة موحّدة وآمنة لإدارة الدعم ورسائل واتساب.':
+      'A unified, secure platform for support and WhatsApp messages.',
+  'مركز خدمة العملاء': 'Customer service center',
+  'كل دردشاتك،\nفي مساحة عمل واحدة.':
+      'All your conversations,\nin one workspace.',
+  'تابع رسائل واتساب، وزّع الدردشات، ونظّم عمل فريقك بتجربة واضحة وسريعة.':
+      'Track WhatsApp messages, assign conversations, and organize your team with a clear, fast experience.',
+  'لديك رسالة جديدة في Wasl': 'You have a new message in Wasl',
+  'مباشر': 'Live',
+  'إعادة اتصال': 'Reconnecting',
+  'رجوع': 'Back',
+  'مركز الدردشات': 'Chat center',
+  'متصل مباشر': 'Live connection',
+  'جاري الاتصال': 'Connecting',
+  'دردشة جديدة': 'New conversation',
+  'ابحث باسم العميل أو داخل الرسائل':
+      'Search by customer name or message content',
+  'الكل': 'All',
+  'متابعة': 'Follow-up',
+  'لم يتم السماح بإشعارات المتصفح. يمكنك تفعيلها من إعدادات الموقع.':
+      'Browser notifications were not allowed. You can enable them in the site settings.',
+  'تفاصيل الدردشة': 'Chat details',
+  'الرسائل ومعلومات العميل وأدوات المتابعة':
+      'Messages, customer information, and follow-up tools',
+  'اختر دردشة للبدء': 'Select a conversation to begin',
+  'ستظهر الرسائل ومعلومات العميل وأدوات المتابعة هنا.':
+      'Messages, customer information, and follow-up tools will appear here.',
+  'مثال: طلب جديد، مهم، شحن': 'Example: new order, important, shipping',
+  'لم تضف ردودًا سريعة بعد.': 'You have not added any quick replies yet.',
+  'نص الرد': 'Reply text',
+  'دليل العملاء': 'Customer directory',
+  'بيانات العملاء ووسومهم وسجل التوصل معهم':
+      'Customer details, tags, and communication history',
+  'التحديث المباشر متصل': 'Live updates connected',
+  'جارٍ إعادة الاتصال بالتحديث المباشر': 'Reconnecting live updates',
+  'فتح الدردشات': 'Open conversations',
+  'مركز إدارة المنصة': 'Platform administration center',
+  'مركز العمل': 'Workspace center',
+  'إدارة المتاجر والاشتراكات وحالة النظام من مكان واحد':
+      'Manage stores, subscriptions, and system health in one place',
+  'تابع العملاء والرسائل وأعمال فريقك لحظة بلحظة':
+      'Follow customers, messages, and team activity in real time',
+  'الوصول مسجل ومحمي. أنهِ الجلسة عند اكتمال الصيانة.':
+      'Access is protected and logged. End the session when maintenance is complete.',
+  'أدوات إدارة المنصة': 'Platform administration tools',
+  'اختر القسم الذي تريد متابعته': 'Choose the section you want to manage',
+  'أقسام': 'sections',
+  'اتصال واتساب': 'WhatsApp connection',
+  'ربط رسمي وآمن عبر Meta': 'Official and secure connection through Meta',
+  'استخدام Meta': 'Meta usage',
+  'الرسائل والتكلفة التقديرية والتنبيهات':
+      'Messages, estimated cost, and alerts',
+  'إدارة موحّدة وآمنة': 'Unified and secure management',
+  'لوحة خدمة العملاء': 'Customer service dashboard',
+  'كل ما تحتاجه لإدارة Wasl في لوحة واحدة واضحة.':
+      'Everything you need to manage Wasl in one clear dashboard.',
+  'ابدأ يومك من هنا، وتابع الرسائل التي تحتاج إلى انتباهك.':
+      'Start your day here and follow the messages that need your attention.',
+  'الإصدار الحالي': 'Current version',
+  'رسائل جديدة': 'New messages',
+  'حالة النظام': 'System status',
+  'دردشات تنتظر': 'Waiting conversations',
+  'جاري استعادة الاتصال المباشر': 'Restoring the live connection',
+  'لا توجد رسائل جديدة الآن': 'There are no new messages right now',
+  'تفعيل الإشعارات': 'Enable notifications',
+  'الصندوق': 'Inbox',
+  'إدارة الموظفين والأدوار والصلاحيات التشغيلية':
+      'Manage employees, roles, and operational permissions',
+  'استخدام واتساب وفوترة Meta': 'WhatsApp usage and Meta billing',
+  'متابعة الرسائل والحدود والتكلفة التقديرية لدى Meta':
+      'Track messages, limits, and estimated Meta cost',
+  'تحديث بيانات الاستخدام': 'Refresh usage data',
+  'حدود الاستخدام الشهرية': 'Monthly usage limits',
+  'الحد الأقصى للرسائل': 'Maximum messages',
+  'حد الرسائل التسويقية': 'Marketing message limit',
+  'حد التكلفة التقديرية': 'Estimated cost limit',
+  'إيقاف الرسائل التسويقية الجديدة عند بلوغ الحد':
+      'Pause new marketing messages when the limit is reached',
+  'لا تتوقف رسائل خدمة العملاء الضرورية.':
+      'Essential customer service messages will not be stopped.',
+  'حفظ الحدود': 'Save limits',
+  'تم حفظ حدود الاستخدام.': 'Usage limits saved.',
+  'اشتراك Wasl منفصل عن رسوم Meta. الأرقام المعروضة تقديرية من سجلات الرسائل وليست فاتورة Meta النهائية.':
+      'Your Wasl subscription is separate from Meta fees. Displayed figures are estimates from message records, not Meta’s final invoice.',
+  'الرسائل الواردة': 'Inbound messages',
+  'الرسائل الصادرة': 'Outbound messages',
+  'الرسائل التسويقية': 'Marketing messages',
+  'التكلفة التقديرية': 'Estimated cost',
+  'تقدير فقط': 'Estimate only',
+  'الاستخدام اليومي': 'Daily usage',
+  'لا توجد سجلات استخدام في هذه الفترة.':
+      'There are no usage records for this period.',
+  'الحدود والتنبيهات': 'Limits and alerts',
+  'تعديل الحدود': 'Edit limits',
+  'لم يتم تحديد حد شهري مخصص للرسائل.':
+      'No custom monthly message limit has been set.',
+  'لا توجد فترة سابقة كافية للمقارنة.':
+      'There is not enough previous-period data for comparison.',
+  'تنبيهات الاستخدام': 'Usage alerts',
+  'لا توجد تنبيهات استخدام حاليًا.': 'There are currently no usage alerts.',
+  'تحديد كمقروء': 'Mark as read',
+  'تعذر تحميل بيانات الاستخدام.': 'Usage data could not be loaded.',
+  'قراءة سريعة لنمو المنصة ونشاط المتاجر':
+      'A quick view of platform growth and store activity',
+  'ملخص أداء المتجر وحركة الدردشات':
+      'Store performance and conversation activity summary',
+  'إنشاء المتاجر ومتابعة حالتها ووصول الدعم وواتساب':
+      'Create stores and monitor their status, support access, and WhatsApp',
+  'جلسة دعم': 'Support session',
+  'الهوية وبيانات التوصل والحالة التشغيلية':
+      'Identity, contact details, and operating status',
+  'تفاصيل الباقة والحدود والاستهلاك الحالي':
+      'Plan details, limits, and current usage',
+  'إدارة الباقات والحدود والمزايا لكل متجر':
+      'Manage plans, limits, and features for each store',
+  'تحكم كامل في وصول مدير المنصة للدردشات':
+      'Full control over platform administrator access to conversations',
+  'الإعدادات': 'Settings',
+  'اللغة والمظهر والإشعارات': 'Language, appearance, and notifications',
+  'اللغة والمظهر وإشعارات مساحة العمل':
+      'Workspace language, appearance, and notifications',
+  'اختر لغة الواجهة واتجاهها': 'Choose the interface language and direction',
+  'المظهر': 'Appearance',
+  'إشعارات المتصفح': 'Browser notifications',
+  'الإشعارات مفعلة للرسائل الجديدة.':
+      'Notifications are enabled for new messages.',
+  'فعّل التنبيهات حتى تظهر الرسائل الجديدة خارج اللوحة.':
+      'Enable alerts to see new messages outside the dashboard.',
+  'مفعلة': 'Enabled',
+  'تفعيل': 'Enable',
+  'لم يتم السماح بالإشعارات. فعّلها من إعدادات الموقع.':
+      'Notifications were not allowed. Enable them in the site settings.',
+  'الدعم الفني': 'Technical support',
+  'حالة النظام وحل المشكلات': 'System status and troubleshooting',
+  'تشخيص حالة المنصة وخطوات حل المشكلات':
+      'Platform diagnostics and troubleshooting steps',
+  'فحص الحالة': 'Check status',
+  'جاري فحص حالة الخادم': 'Checking server status',
+  'الخادم يعمل بصورة طبيعية': 'The server is operating normally',
+  'تعذر الوصول إلى الخادم': 'The server could not be reached',
+  'التحديث المباشر يعيد الاتصال': 'Live updates keep reconnecting',
+  'تأكد من اتصال الإنترنت ثم حدّث الصفحة. إذا استمرت المشكلة راجع صحة API ووسيط HTTPS.':
+      'Check the internet connection and refresh the page. If it continues, verify API health and the HTTPS proxy.',
+  'إشعارات الرسائل لا تظهر': 'Message notifications do not appear',
+  'افتح الإعدادات وفعّل إشعارات المتصفح، ثم اسمح بها من إعدادات الموقع.':
+      'Open Settings, enable browser notifications, then allow them in the site settings.',
+  'اتصال Meta يحتاج إجراء': 'Meta connection needs attention',
+  'افتح اتصال واتساب، نفّذ المزامنة واختبار الاتصال، ثم أعد الربط إذا انتهى تفويض Meta.':
+      'Open WhatsApp connection, sync and test it, then reconnect if Meta authorization has expired.',
+  'يربط رقم واتساب الموجود عن طريق مسح QR. لا تحتاج إلى حساب مطور لدى Meta، لكن خادم الربط الخارجي يجب أن يكون جاهزًا.':
+      'Connects your existing WhatsApp number by scanning a QR code. You do not need a Meta developer account, but the external bridge server must be ready.',
+  'يمكن لمدير المنصة بدء جلسة دعم مسجلة خلال المدة المحددة.':
+      'The platform administrator can start a logged support session during the selected period.',
+  'تعذر رفع الملف. تحقق من اتصال الإنترنت وحاول مرة أخرى.':
+      'Could not upload the file. Check your connection and try again.',
+  'إلغاء التسجيل': 'Cancel recording',
+  'جارٍ التسجيل': 'Recording',
+  'إرسال الرسالة الصوتية': 'Send voice message',
+  'تسجيل رسالة صوتية': 'Record a voice message',
+  'إرسال صورة': 'Send an image',
+  'اسمح للتطبيق باستخدام الميكروفون أولاً.': 'Allow microphone access first.',
+  'التسجيل قصير جدًا. سجل ثانية واحدة على الأقل.':
+      'The recording is too short. Record for at least one second.',
+  'جارٍ رفع الصورة…': 'Uploading image…',
+  'جارٍ إرسال الرسالة الصوتية…': 'Sending voice message…',
+  'صورة': 'Image',
+  'رسالة صوتية': 'Voice message',
+  'تعذر تحميل الصورة': 'Could not load the image',
+  'تعذر تحميل الرسالة الصوتية': 'Could not load the voice message',
+  'فتح الصورة': 'Open image',
+  'الصورة': 'Image',
+  'تعذر تشغيل الرسالة الصوتية': 'Could not play the voice message',
+  'تعذر تجهيز ملف الوسائط للتشغيل.':
+      'Could not prepare the media file for playback.',
+  'إيقاف مؤقت': 'Pause',
+  'تشغيل': 'Play',
+  '• الإعداد الافتراضي مغلق.\n• كل جلسة دعم لها سبب ووقت انتهاء.\n• قراءة أي دردشة أثناء جلسة الدعم تُسجل في سجل التدقيق.\n• يمكنك إلغاء الصلاحية فورًا في أي وقت.':
+      '• Access is off by default.\n• Every support session has a reason and an expiry time.\n• Opening any conversation during a support session is recorded in the audit log.\n• You can revoke access immediately at any time.',
+  'الملغاة': 'Cancelled',
+  'دردشات فريقك، بشكل أبسط وأسرع': 'Your team chats, simpler and faster',
+  'مظهر الدردشة': 'Chat appearance',
+  'لون الرسائل المرسلة': 'Sent message color',
+  'لون الرسائل المستلمة': 'Received message color',
+  'خلفية الدردشة': 'Chat background',
+  'حجم خط الرسائل': 'Message font size',
+  'صغير': 'Small',
+  'متوسط': 'Medium',
+  'كبير': 'Large',
+  'نمط خفيف في الخلفية': 'Subtle background pattern',
+  'إظهار رسومات بسيطة وغير مزعجة': 'Show a subtle, unobtrusive pattern',
+  'استعادة الإعدادات الافتراضية': 'Reset to defaults',
+  'مرحبًا، كيف أقدر أخدمك؟': 'Hello, how can I help you?',
+  'أهلًا! أنا معك الآن.': 'Hi! I am here with you now.',
+  'تعذر تحميل الدردشة': 'Could not load chat',
+  'إلغاء الدردشة': 'Cancel chat',
+  'إرفاق': 'Attach',
+  'الكاميرا': 'Camera',
+  'إرسال التسجيل': 'Send recording',
+  'جارٍ التسجيل…': 'Recording…',
+  'فيديو': 'Video',
+  'ملف': 'File',
+  'تعذر قراءة الملف المحدد': 'Could not read the selected file',
+  'جارٍ رفع الفيديو…': 'Uploading video…',
+  'جارٍ رفع الملف…': 'Uploading file…',
+  'ملف مرفق': 'Attached file',
+  'فشل الإرسال. اضغط وحاول مرة أخرى.': 'Sending failed. Tap to try again.',
+  'تعذر تشغيل الفيديو': 'Could not play the video',
+  'تعذر فتح الملف على هذا الجهاز': 'Could not open the file on this device',
+  'تعذر تنزيل الملف': 'Could not download the file',
+  'تعذر عرض الصورة': 'Could not display the image',
+  'فتح': 'Open',
+  'بدء دردشة': 'Start chat',
+  'اكتب الرسالة الأولى': 'Write the first message',
+  'ابدأ المحادثة برسالة للعميل': 'Start the chat with a message to the customer',
+  'تم إنشاء الدردشة': 'Chat created',
+  'تعذر بدء الدردشة': 'Could not start the chat',
+  'ابدأ دردشة مع هذا العميل': 'Start a chat with this customer',
+  'جارٍ الإرسال…': 'Sending…',
+  'سيظهر العملاء هنا عند بدء المحادثات معهم.': 'Customers will appear here when you start chatting with them.',
+  'خلفية الدردشة وألوان الرسائل وحجم الخط': 'Chat background, message colors, and font size',
+  'أنت على اطلاع بكل الرسائل. ستظهر هنا المحادثات غير المقروءة.': 'You are all caught up. Unread chats will appear here.',
+};

@@ -1,0 +1,44 @@
+name: support_hub
+description: Wasl employee conversations app for Android
+publish_to: none
+version: 2.8.3+44
+
+environment:
+  sdk: '>=3.6.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+  google_fonts: ^8.2.0
+  cupertino_icons: ^1.0.8
+  http: ^1.2.2
+  http_parser: ^4.1.2
+  shared_preferences: ^2.3.2
+  flutter_secure_storage: ^10.3.1
+  firebase_core: ^4.12.1
+  firebase_messaging: ^16.4.3
+  image_picker: ^1.2.3
+  just_audio: ^0.10.6
+  path_provider: ^2.1.6
+  record: ^7.1.1
+  video_player: ^2.9.2
+  file_picker: 10.3.10
+  open_filex: ^4.5.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/branding/wasl_logo.png
+    - assets/branding/wasl_logo_512.png
+    - assets/branding/wasl_logo_circle.png
+  fonts:
+    - family: NotoSansArabic
+      fonts:
+        - asset: assets/fonts/NotoSansArabic-Variable.ttf

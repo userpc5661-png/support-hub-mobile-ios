@@ -1,0 +1,28 @@
+Wasl Mobile 2.8.2+43 — Dark Mode, Navigation & Notifications
+============================================================
+
+Modified:
+- pubspec.yaml
+- lib/app.dart
+- lib/core/theme/theme_presets.dart
+- lib/core/theme/chat_appearance_controller.dart
+- lib/core/theme/support_hub_design.dart
+- lib/features/settings/settings_screen.dart
+- lib/features/settings/chat_appearance_screen.dart
+- lib/features/shell/workspace_shell.dart
+- lib/features/notifications/notifications_screen.dart
+- lib/features/auth/splash_screen.dart
+- lib/features/conversations/conversations_screen.dart
+- test/theme_preferences_test.dart
+
+Added:
+- lib/core/notifications/in_app_notification_gate.dart
+- V2.8.2_UPDATE_NOTES.md
+- test/in_app_notification_gate_test.dart
+
+Highlights:
+- Neutral true-dark default palette.
+- Circular selected bottom-navigation item.
+- iOS-ready glass blur surface.
+- Realtime in-app notification banners with exact-conversation opening.
+- FCM/realtime notification deduplication.

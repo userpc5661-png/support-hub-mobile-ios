@@ -1,0 +1,71 @@
+name: Build Wasl iOS IPA
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build-ios:
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.44.6'
+          channel: 'stable'
+          cache: true
+
+      - name: Flutter version
+        run: flutter --version
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Validate iOS files
+        run: |
+          test -d ios
+          test -f ios/Runner/Info.plist
+          test -f ios/Runner/GoogleService-Info.plist
+
+      - name: Build unsigned iOS release
+        shell: bash
+        run: |
+          if [ -f firebase_defines.json ]; then
+            flutter build ios \
+              --release \
+              --no-codesign \
+              --dart-define=API_BASE_URL=https://go-wasl.com/api \
+              --dart-define-from-file=firebase_defines.json
+          else
+            echo "firebase_defines.json not found - building without external Firebase defines"
+            flutter build ios \
+              --release \
+              --no-codesign \
+              --dart-define=API_BASE_URL=https://go-wasl.com/api
+          fi
+
+      - name: Create unsigned IPA
+        shell: bash
+        run: |
+          rm -rf build/ios/ipa_unsigned
+          mkdir -p build/ios/ipa_unsigned/Payload
+          cp -R build/ios/iphoneos/Runner.app build/ios/ipa_unsigned/Payload/
+
+          cd build/ios/ipa_unsigned
+          zip -qry "../Wasl-2.8.3+44-unsigned.ipa" Payload
+
+      - name: Verify IPA
+        shell: bash
+        run: |
+          ls -lh build/ios/Wasl-2.8.3+44-unsigned.ipa
+          unzip -l build/ios/Wasl-2.8.3+44-unsigned.ipa | head -40
+
+      - name: Upload IPA
+        uses: actions/upload-artifact@v4
+        with:
+          name: Wasl-iOS-2.8.3+44-unsigned
+          path: build/ios/Wasl-2.8.3+44-unsigned.ipa
+          if-no-files-found: error

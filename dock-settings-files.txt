@@ -1,0 +1,706 @@
+﻿===== account_screen.dart =====
+import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
+import '../../core/localization/app_locale_controller.dart';
+import '../../core/network/api_client.dart';
+import '../../core/notifications/push_notification_service.dart';
+import '../../core/theme/support_hub_design.dart';
+import '../../core/theme/theme_controller.dart';
+import '../../core/widgets/support_hub_widgets.dart';
+import '../auth/auth_controller.dart';
+import '../employees/employee_model.dart';
+import '../settings/settings_screen.dart';
+import '../settings/chat_appearance_screen.dart';
+
+class AccountScreen extends StatelessWidget {
+  const AccountScreen({
+    super.key,
+    required this.controller,
+    required this.api,
+    this.themeController,
+    this.pushNotifications,
+  });
+
+  final AuthController controller;
+  final ApiClient api;
+  final ThemeController? themeController;
+  final PushNotificationService? pushNotifications;
+
+  @override
+  Widget build(BuildContext context) {
+    final user = controller.user!;
+    return Scaffold(
+      backgroundColor: context.hubScheme.surfaceContainerLowest,
+      body: SafeArea(
+        child: ListView(
+          padding: const EdgeInsets.only(bottom: 110),
+          children: [
+            HubPageHeader(
+              title: tr('Ø§Ù„Ø­Ø³Ø§Ø¨'),
+              subtitle: user.storeName ?? tr('Ù…Ø³Ø§Ø­Ø© Ø§Ù„Ø¹Ù…Ù„'),
+              leading: _RoundPageIcon(
+                icon: Icons.manage_accounts_rounded,
+                color: context.hubScheme.primary,
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: HubSpace.md),
+              child: Container(
+                padding: const EdgeInsets.all(24),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [context.hubScheme.primary, context.hubScheme.primary.withValues(alpha: 0.8)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.circular(28),
+                  boxShadow: [
+                    BoxShadow(
+                      color: context.hubScheme.primary.withValues(alpha: 0.25),
+                      blurRadius: 15,
+                      offset: const Offset(0, 6),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  children: [
+                    _EditableProfileAvatar(
+                      controller: controller,
+                      api: api,
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      user.name,
+                      textAlign: TextAlign.center,
+                      style: context.hubText.headlineSmall?.copyWith(
+                        color: context.hubScheme.onPrimary,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: -0.5,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      '${user.roleLabel}  â€¢  @${user.username}',
+                      textDirection: TextDirection.ltr,
+                      style: TextStyle(
+                        color: context.hubScheme.onPrimary.withValues(alpha: .85),
+                        fontWeight: FontWeight.w600,
+                        fontSize: 13,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: HubSpace.lg),
+            _SectionLabel(tr('Ø§Ù„ØªÙØ¶ÙŠÙ„Ø§Øª')),
+            _AccountGroup(children: [
+              if (themeController != null)
+                _AccountTile(
+                  icon: Icons.palette_outlined,
+                  title: tr('Ø§Ù„Ù…Ø¸Ù‡Ø± ÙˆØ§Ù„ØªØ®ØµÙŠØµ'),
+                  subtitle: tr('Ø§Ù„Ø£Ù„ÙˆØ§Ù† ÙˆØ§Ù„ÙˆØ¶Ø¹ Ø§Ù„Ø¯Ø§ÙƒÙ† ÙˆØ§Ù„Ù„ØºØ©'),
+                  onTap: () =>
+                      Navigator.of(context).push(MaterialPageRoute<void>(
+                    builder: (_) =>
+                        SettingsScreen(
+                          themeController: themeController!,
+                          pushNotifications: pushNotifications,
+                        ),
+                  )),
+                ),
+              _AccountTile(
+                icon: Icons.wallpaper_rounded,
+                title: tr('Ù…Ø¸Ù‡Ø± Ø§Ù„Ø¯Ø±Ø¯Ø´Ø©'),
+                subtitle: tr('Ø®Ù„ÙÙŠØ© Ø§Ù„Ø¯Ø±Ø¯Ø´Ø© ÙˆØ£Ù„ÙˆØ§Ù† Ø§Ù„Ø±Ø³Ø§Ø¦Ù„ ÙˆØ­Ø¬Ù… Ø§Ù„Ø®Ø·'),
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => const ChatAppearanceScreen(),
+                  ),
+                ),
+              ),
+              if (user.role != 'employee') ...[
+                _AccountTile(
+                  icon: Icons.alternate_email_rounded,
+                  title: tr('ØªØºÙŠÙŠØ± Ø§Ø³Ù… Ø§Ù„Ù…Ø³ØªØ®Ø¯Ù…'),
+                  subtitle: '@${user.username}',
+                  onTap: () => _changeUsername(context),
+                ),
+                _AccountTile(
+                  icon: Icons.lock_outline_rounded,
+                  title: tr('ØªØºÙŠÙŠØ± ÙƒÙ„Ù…Ø© Ø§Ù„Ù…Ø±ÙˆØ±'),
+                  subtitle: tr('Ø­Ø§ÙØ¸ Ø¹Ù„Ù‰ Ø£Ù…Ø§Ù† Ø­Ø³Ø§Ø¨Ùƒ'),
+                  onTap: () => _changePassword(context),
+                ),
+              ],
+            ]),
+            const SizedBox(height: HubSpace.lg),
+            _SectionLabel(tr('Ù…Ø¹Ù„ÙˆÙ…Ø§Øª Ø§Ù„Ø­Ø³Ø§Ø¨')),
+            _AccountGroup(children: [
+              if ((user.email ?? '').isNotEmpty)
+                _AccountTile(
+                  icon: Icons.mail_outline_rounded,
+                  title: tr('Ø§Ù„Ø¨Ø±ÙŠØ¯ Ø§Ù„Ø¥Ù„ÙƒØªØ±ÙˆÙ†ÙŠ'),
+                  subtitle: user.email!,
+                ),
+              _AccountTile(
+                icon: Icons.verified_user_outlined,
+                title: tr('Ø§Ù„Ø¯ÙˆØ± ÙˆØ§Ù„ØµÙ„Ø§Ø­ÙŠØ§Øª'),
+                subtitle: tr('${user.permissions.length} ØµÙ„Ø§Ø­ÙŠØ© Ù…ÙØ¹Ù„Ø©'),
+                onTap: () => _showPermissions(context),
+              ),
+            ]),
+            const SizedBox(height: HubSpace.lg),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: HubSpace.md),
+              child: OutlinedButton.icon(
+                onPressed: controller.logout,
+                icon: const Icon(Icons.logout_rounded),
+                label: Text(tr('ØªØ³Ø¬ÙŠÙ„ Ø§Ù„Ø®Ø±ÙˆØ¬')),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: context.hubScheme.error,
+                  side: BorderSide(
+                      color: context.hubScheme.error.withValues(alpha: .35)),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showPermissions(BuildContext context) {
+    final permissions = controller.user!.permissions;
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      builder: (_) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(
+              HubSpace.lg, 0, HubSpace.lg, HubSpace.xl),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(tr('Ø§Ù„ØµÙ„Ø§Ø­ÙŠØ§Øª Ø§Ù„Ù…ÙØ¹Ù„Ø©'),
+                  style: context.hubText.titleLarge
+                      ?.copyWith(fontWeight: FontWeight.w800)),
+              const SizedBox(height: HubSpace.md),
+              if (permissions.isEmpty)
+                Text(tr('Ù„Ø§ ØªÙˆØ¬Ø¯ ØµÙ„Ø§Ø­ÙŠØ§Øª Ù…Ø®ØµØµØ© Ù„Ù‡Ø°Ø§ Ø§Ù„Ø­Ø³Ø§Ø¨.'))
+              else
+                ConstrainedBox(
+                  constraints: BoxConstraints(
+                      maxHeight: MediaQuery.sizeOf(context).height * .55),
+                  child: SingleChildScrollView(
+                    child: Wrap(
+                      spacing: HubSpace.xs,
+                      runSpacing: HubSpace.xs,
+                      children: permissions
+                          .map((permission) => Chip(
+                                avatar: const Icon(
+                                    Icons.check_circle_outline_rounded,
+                                    size: 17),
+                                label: Text(permissionLabel(permission)),
+                              ))
+                          .toList(),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _changeUsername(BuildContext context) async {
+    final username = TextEditingController(text: controller.user!.username);
+    final password = TextEditingController();
+    final result = await showDialog<List<String>>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: Text(tr('ØªØºÙŠÙŠØ± Ø§Ø³Ù… Ø§Ù„Ù…Ø³ØªØ®Ø¯Ù…')),
+        content: SizedBox(
+          width: 430,
+          child: Column(mainAxisSize: MainAxisSize.min, children: [
+            TextField(
+              controller: username,
+              textDirection: TextDirection.ltr,
+              decoration: InputDecoration(labelText: tr('Ø§Ø³Ù… Ø§Ù„Ù…Ø³ØªØ®Ø¯Ù… Ø§Ù„Ø¬Ø¯ÙŠØ¯')),
+            ),
+            const SizedBox(height: HubSpace.sm),
+            TextField(
+              controller: password,
+              obscureText: true,
+              decoration: InputDecoration(labelText: tr('ÙƒÙ„Ù…Ø© Ø§Ù„Ù…Ø±ÙˆØ± Ø§Ù„Ø­Ø§Ù„ÙŠØ©')),
+            ),
+          ]),
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: Text(tr('Ø¥Ù„ØºØ§Ø¡'))),
+          FilledButton(
+              onPressed: () =>
+                  Navigator.pop(context, [username.text, password.text]),
+              child: Text(tr('Ø­ÙØ¸'))),
+        ],
+      ),
+    );
+    username.dispose();
+    password.dispose();
+    if (result == null || result[0].trim().length < 3 || result[1].isEmpty) {
+      return;
+    }
+    final ok = await controller.changeUsername(result[0], result[1]);
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(ok
+              ? tr('ØªÙ… ØªØºÙŠÙŠØ± Ø§Ø³Ù… Ø§Ù„Ù…Ø³ØªØ®Ø¯Ù….')
+              : controller.error ?? tr('ØªØ¹Ø°Ø± Ø§Ù„ØªØºÙŠÙŠØ±.'))));
+    }
+  }
+
+  Future<void> _changePassword(BuildContext context) async {
+    final current = TextEditingController();
+    final next = TextEditingController();
+    final confirm = TextEditingController();
+    final result = await showDialog<List<String>>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: Text(tr('ØªØºÙŠÙŠØ± ÙƒÙ„Ù…Ø© Ø§Ù„Ù…Ø±ÙˆØ±')),
+        content: SizedBox(
+          width: 430,
+          child: Column(mainAxisSize: MainAxisSize.min, children: [
+            TextField(
+                controller: current,
+                obscureText: true,
+                decoration:
+                    InputDecoration(labelText: tr('ÙƒÙ„Ù…Ø© Ø§Ù„Ù…Ø±ÙˆØ± Ø§Ù„Ø­Ø§Ù„ÙŠØ©'))),
+            const SizedBox(height: HubSpace.sm),
+            TextField(
+                controller: next,
+                obscureText: true,
+                decoration:
+                    InputDecoration(labelText: tr('ÙƒÙ„Ù…Ø© Ø§Ù„Ù…Ø±ÙˆØ± Ø§Ù„Ø¬Ø¯ÙŠØ¯Ø©'))),
+            const SizedBox(height: HubSpace.sm),
+            TextField(
+                controller: confirm,
+                obscureText: true,
+                decoration:
+                    InputDecoration(labelText: tr('ØªØ£ÙƒÙŠØ¯ ÙƒÙ„Ù…Ø© Ø§Ù„Ù…Ø±ÙˆØ±'))),
+          ]),
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: Text(tr('Ø¥Ù„ØºØ§Ø¡'))),
+          FilledButton(
+              onPressed: () => Navigator.pop(
+                  context, [current.text, next.text, confirm.text]),
+              child: Text(tr('Ø­ÙØ¸'))),
+        ],
+      ),
+    );
+    current.dispose();
+    next.dispose();
+    confirm.dispose();
+    if (result == null) return;
+    if (result[1].length < 8 || result[1] != result[2]) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text(tr('ØªØ­Ù‚Ù‚ Ù…Ù† Ø·ÙˆÙ„ ÙƒÙ„Ù…Ø© Ø§Ù„Ù…Ø±ÙˆØ± ÙˆØªØ·Ø§Ø¨Ù‚ Ø§Ù„ØªØ£ÙƒÙŠØ¯.'))));
+      }
+      return;
+    }
+    final ok = await controller.changePassword(result[0], result[1]);
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(ok
+              ? tr('ØªÙ… ØªØºÙŠÙŠØ± ÙƒÙ„Ù…Ø© Ø§Ù„Ù…Ø±ÙˆØ±.')
+              : controller.error ?? tr('ØªØ¹Ø°Ø± Ø§Ù„ØªØºÙŠÙŠØ±.'))));
+    }
+  }
+}
+
+
+class _EditableProfileAvatar extends StatefulWidget {
+  const _EditableProfileAvatar({required this.controller, required this.api});
+
+  final AuthController controller;
+  final ApiClient api;
+
+  @override
+  State<_EditableProfileAvatar> createState() =>
+      _EditableProfileAvatarState();
+}
+
+class _EditableProfileAvatarState extends State<_EditableProfileAvatar> {
+  final picker = ImagePicker();
+  bool uploading = false;
+
+  Future<void> _pick() async {
+    if (uploading) return;
+    try {
+      final file = await picker.pickImage(
+        source: ImageSource.gallery,
+        imageQuality: 88,
+        maxWidth: 1440,
+        requestFullMetadata: false,
+      );
+      if (file == null) return;
+      final bytes = await file.readAsBytes();
+      if (bytes.length > 5 * 1024 * 1024) {
+        throw StateError(tr('Ø­Ø¬Ù… Ø§Ù„ØµÙˆØ±Ø© ÙŠØªØ¬Ø§ÙˆØ² 5 Ù…ÙŠØ¬Ø§Ø¨Ø§ÙŠØª.'));
+      }
+      setState(() => uploading = true);
+      final ok = await widget.controller.uploadAvatar(
+        bytes: bytes,
+        fileName: file.name,
+        mimeType: file.mimeType ?? 'image/jpeg',
+      );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(ok
+              ? tr('ØªÙ… ØªØ­Ø¯ÙŠØ« Ø§Ù„ØµÙˆØ±Ø© Ø§Ù„Ø´Ø®ØµÙŠØ©.')
+              : widget.controller.error ?? tr('ØªØ¹Ø°Ø± ØªØ­Ø¯ÙŠØ« Ø§Ù„ØµÙˆØ±Ø© Ø§Ù„Ø´Ø®ØµÙŠØ©.')),
+        ),
+      );
+      setState(() {});
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(error.toString())));
+    } finally {
+      if (mounted) setState(() => uploading = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final user = widget.controller.user!;
+    return Semantics(
+      button: true,
+      label: tr('ØªØºÙŠÙŠØ± Ø§Ù„ØµÙˆØ±Ø© Ø§Ù„Ø´Ø®ØµÙŠØ©'),
+      child: GestureDetector(
+        onTap: _pick,
+        child: Stack(
+          clipBehavior: Clip.none,
+          children: [
+            HubAvatar(
+              name: user.name,
+              imageUrl: user.avatarUrl,
+              api: widget.api,
+              size: 88,
+              online: true,
+              color: Colors.white,
+            ),
+            PositionedDirectional(
+              end: -3,
+              bottom: 1,
+              child: Container(
+                width: 30,
+                height: 30,
+                decoration: BoxDecoration(
+                  color: context.hubScheme.surface,
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: context.hubScheme.primary.withValues(alpha: .3),
+                  ),
+                ),
+                child: uploading
+                    ? const Padding(
+                        padding: EdgeInsets.all(7),
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : Icon(
+                        Icons.camera_alt_rounded,
+                        size: 17,
+                        color: context.hubScheme.primary,
+                      ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _RoundPageIcon extends StatelessWidget {
+  const _RoundPageIcon({required this.icon, required this.color});
+  final IconData icon;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) => Container(
+        width: 46,
+        height: 46,
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: .1),
+          shape: BoxShape.circle,
+        ),
+        child: Icon(icon, color: color),
+      );
+}
+
+class _SectionLabel extends StatelessWidget {
+  const _SectionLabel(this.label);
+  final String label;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+        padding:
+            const EdgeInsets.fromLTRB(HubSpace.lg, 0, HubSpace.lg, HubSpace.xs),
+        child: Text(label,
+            style: TextStyle(
+                color: context.hubScheme.onSurfaceVariant,
+                fontWeight: FontWeight.w700)),
+      );
+}
+
+class _AccountGroup extends StatelessWidget {
+  const _AccountGroup({required this.children});
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) => Container(
+        margin: const EdgeInsets.symmetric(horizontal: HubSpace.md),
+        decoration: BoxDecoration(
+          color: context.hubScheme.surface,
+          borderRadius: BorderRadius.circular(HubRadius.lg),
+          border: Border.all(
+              color: context.hubScheme.outlineVariant.withValues(alpha: .38)),
+        ),
+        child: Column(
+          children: [
+            for (var i = 0; i < children.length; i++) ...[
+              children[i],
+              if (i < children.length - 1)
+                Divider(
+                  height: 1,
+                  indent: 68,
+                  endIndent: HubSpace.md,
+                  color:
+                      context.hubScheme.outlineVariant.withValues(alpha: .38),
+                ),
+            ],
+          ],
+        ),
+      );
+}
+
+class _AccountTile extends StatelessWidget {
+  const _AccountTile({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    this.onTap,
+  });
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) => ListTile(
+        onTap: onTap,
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: HubSpace.md, vertical: 5),
+        leading: Container(
+          width: 40,
+          height: 40,
+          decoration: BoxDecoration(
+            color: context.hubScheme.primary,
+            borderRadius: BorderRadius.circular(HubRadius.sm),
+          ),
+          child: Icon(icon, color: context.hubScheme.onPrimary, size: 20),
+        ),
+        title: Text(title, style: const TextStyle(fontWeight: FontWeight.w700)),
+        subtitle: Text(subtitle,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            textDirection: subtitle.startsWith('@') || subtitle.contains('@')
+                ? TextDirection.ltr
+                : null),
+        trailing: onTap == null
+            ? null
+            : const Icon(Icons.chevron_right_rounded, size: 21),
+      );
+}
+===== theme_controller.dart =====
+import 'dart:convert';
+import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import '../network/api_client.dart';
+import 'theme_contrast_validator.dart';
+import 'theme_preferences.dart';
+
+class ThemeController extends ChangeNotifier {
+  ThemeController(this.api);
+  static const _key = 'appearance_preferences';
+  final ApiClient api;
+  ThemePreferences preferences = const ThemePreferences();
+  String? _boundUserId;
+  bool saving = false;
+
+  ThemeMode get mode => preferences.mode;
+  String get _activeCacheKey =>
+      _boundUserId == null ? _key : '${_key}_${_boundUserId!}';
+
+  Future<void> initialize() async {
+    preferences = await _readCached(_key) ?? preferences;
+    notifyListeners();
+  }
+
+  Future<ThemePreferences?> _readCached(String key) async {
+    final raw = (await SharedPreferences.getInstance()).getString(key);
+    if (raw != null) {
+      try {
+        return ThemePreferences.fromApi(
+            Map<String, dynamic>.from(jsonDecode(raw) as Map));
+      } catch (_) {}
+    }
+    return null;
+  }
+
+  Future<void> bindUser(String? userId) async {
+    if (_boundUserId == userId) return;
+    _boundUserId = userId;
+    // Keep the last authenticated appearance on the login screen. The app
+    // cannot know the next account before authentication, so the last local
+    // appearance is the safest non-flashing choice.
+    if (userId != null) {
+      preferences = const ThemePreferences();
+    }
+    final cacheKey = _activeCacheKey;
+    final cached = await _readCached(cacheKey);
+    if (_boundUserId != userId) return;
+    if (cached != null) preferences = cached;
+    notifyListeners();
+    if (userId == null) return;
+    try {
+      final remote = ThemePreferences.fromApi(await api.getMap('/appearance'));
+      if (_boundUserId != userId) return;
+      preferences = remote;
+      await _cache();
+      notifyListeners();
+    } catch (_) {
+      // Keep the cached appearance while offline.
+    }
+  }
+
+  Future<void> setMode(ThemeMode value) =>
+      save(preferences.copyWith(mode: value));
+  Future<void> setPreset(SupportHubThemePreset value) =>
+      save(preferences.copyWith(preset: value, customColors: const {}));
+
+  Future<void> setCustomColor(String key, Color color) {
+    final colors = Map<String, String>.from(preferences.customColors)
+      ..[key] = ThemeContrastValidator.toHex(color);
+    return save(preferences.copyWith(customColors: colors));
+  }
+
+  Future<void> clearCustomColor(String key) {
+    final colors = Map<String, String>.from(preferences.customColors)
+      ..remove(key);
+    return save(preferences.copyWith(customColors: colors));
+  }
+
+  Future<void> clearCustomColors() =>
+      save(preferences.copyWith(customColors: const {}));
+
+  Future<void> save(ThemePreferences value) async {
+    preferences = value;
+    await _cache();
+    notifyListeners();
+    if (_boundUserId == null) return;
+    saving = true;
+    notifyListeners();
+    try {
+      preferences = ThemePreferences.fromApi(
+          await api.putMap('/appearance/me', value.toApi()));
+      await _cache();
+    } catch (_) {
+      // Local selection remains active when the server is temporarily offline
+      // or still running a version without appearance persistence.
+    } finally {
+      saving = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> saveStore(ThemePreferences value,
+      {required bool enforced}) async {
+    saving = true;
+    notifyListeners();
+    try {
+      preferences = ThemePreferences.fromApi(await api.putMap(
+          '/appearance/store', {...value.toApi(), 'enforced': enforced}));
+      await _cache();
+    } catch (_) {
+      // Keep the locally selected store palette until synchronization resumes.
+    } finally {
+      saving = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> _cache() async {
+    final storage = await SharedPreferences.getInstance();
+    final encoded = jsonEncode(preferences.toApi());
+    await storage.setString(_activeCacheKey, encoded);
+    if (_activeCacheKey != _key) {
+      await storage.setString(_key, encoded);
+    }
+  }
+}
+===== pubspec.yaml =====
+name: support_hub
+description: Wasl employee conversations app for Android
+publish_to: none
+version: 2.8.3+44
+
+environment:
+  sdk: '>=3.6.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+  google_fonts: ^8.2.0
+  cupertino_icons: ^1.0.8
+  http: ^1.2.2
+  http_parser: ^4.1.2
+  shared_preferences: ^2.3.2
+  flutter_secure_storage: ^10.3.1
+  firebase_core: ^4.12.1
+  firebase_messaging: ^16.4.3
+  image_picker: ^1.2.3
+  just_audio: ^0.10.6
+  path_provider: ^2.1.6
+  record: ^7.1.1
+  video_player: ^2.9.2
+  file_picker: 10.3.10
+  open_filex: ^4.5.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/branding/wasl_logo.png
+    - assets/branding/wasl_logo_512.png
+    - assets/branding/wasl_logo_circle.png
+  fonts:
+    - family: NotoSansArabic
+      fonts:
+        - asset: assets/fonts/NotoSansArabic-Variable.ttf

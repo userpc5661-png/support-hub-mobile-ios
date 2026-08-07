@@ -1,0 +1,12 @@
+Wasl Mobile 2.8.1+42 source review
+==================================
+- Reviewed the 2.8.0+41 update archive as the base.
+- Removed the multi-layer bottom navigation implementation.
+- Unified Material 3 surface container roles with the configured surface palette.
+- Changed the default brand primary to a teal/mint tone sampled from the Wasl logo.
+- Preserved custom color persistence and per-chat appearance overrides.
+- Re-applied the localization fixes that passed the user's local Flutter tests after 2.8.0+41.
+- Static delimiter/syntax-structure checks passed on all modified Dart files.
+- ZIP integrity is checked before delivery.
+
+Note: A Flutter SDK is not available in this build environment, so flutter analyze/test must be run on the user's machine after extraction.

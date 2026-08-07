@@ -1,0 +1,18 @@
+تحديث تصميم Wasl Mobile 2.6.2+37
+================================
+
+1) خذ نسخة احتياطية من مجلد المشروع.
+2) فك محتويات ملف التحديث داخل جذر مشروع Flutter نفسه، ووافق على استبدال الملفات.
+3) من PowerShell داخل المشروع شغّل:
+
+& "E:\flutter\bin\flutter.bat" clean
+Remove-Item -Recurse -Force ".dart_tool" -ErrorAction SilentlyContinue
+Remove-Item -Recurse -Force "build" -ErrorAction SilentlyContinue
+& "E:\flutter\bin\flutter.bat" pub get
+& "E:\flutter\bin\flutter.bat" run
+
+ملاحظات:
+- تم تثبيت file_picker على 10.3.10 لتجنب خطأ FilePickerPlugin الذي ظهر مع 11.x.
+- لا تستبدل file_picker بـ 11.x في هذه النسخة.
+- التحديث لا يغير API أو endpoints أو منطق الفلاتر والمحادثات.
+- رقم القناة يُقرأ من /meta/connection عند توفر الصلاحية، وإلا يظهر نص بديل.

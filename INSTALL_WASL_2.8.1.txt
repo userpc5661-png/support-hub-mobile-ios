@@ -1,0 +1,15 @@
+Wasl Mobile 2.8.1+42
+====================
+
+1. Back up your current project.
+2. Extract this ZIP over your CURRENT Wasl mobile project and allow overwrite.
+3. Do not delete your existing assets/fonts folder; this revision does not include font binaries.
+4. From PowerShell in the project folder run:
+
+& "E:\flutter\bin\flutter.bat" clean
+& "E:\flutter\bin\flutter.bat" pub get
+& "E:\flutter\bin\flutter.bat" analyze
+& "E:\flutter\bin\flutter.bat" test
+& "E:\flutter\bin\flutter.bat" run
+
+Expected: no analyzer errors and all tests pass.

@@ -1,0 +1,1082 @@
+﻿===== settings_screen.dart =====
+import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
+
+import '../../core/localization/app_locale_controller.dart';
+import '../../core/notifications/browser_notification_service.dart';
+import '../../core/notifications/push_notification_service.dart';
+import '../../core/theme/theme_contrast_validator.dart';
+import '../../core/theme/theme_controller.dart';
+import '../../core/theme/theme_preferences.dart';
+import '../../core/theme/theme_presets.dart';
+import '../../core/theme/support_hub_design.dart';
+
+class SettingsScreen extends StatefulWidget {
+  const SettingsScreen({
+    super.key,
+    required this.themeController,
+    this.pushNotifications,
+  });
+
+  final ThemeController themeController;
+  final PushNotificationService? pushNotifications;
+
+  @override
+  State<SettingsScreen> createState() => _SettingsScreenState();
+}
+
+class _SettingsScreenState extends State<SettingsScreen> {
+  final browserNotifications = BrowserNotificationService();
+  PushPermissionState pushPermission = PushPermissionState.unavailable;
+  bool checkingPushPermission = false;
+
+  bool get usesNativePush => !kIsWeb && widget.pushNotifications != null;
+
+  @override
+  void initState() {
+    super.initState();
+    if (usesNativePush) _refreshPushPermission();
+  }
+
+  Future<void> _refreshPushPermission() async {
+    final service = widget.pushNotifications;
+    if (service == null) return;
+    final value = await service.permissionState();
+    if (mounted) setState(() => pushPermission = value);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: context.hubScheme.surfaceContainerLowest,
+      appBar: AppBar(
+        title: Text(tr('Ø§Ù„Ù…Ø¸Ù‡Ø± ÙˆØ§Ù„ØªØ®ØµÙŠØµ')),
+        leading: IconButton(
+          onPressed: () => Navigator.of(context).pop(),
+          icon: const Icon(Icons.arrow_back_ios_new_rounded),
+        ),
+      ),
+      body: SafeArea(
+        top: false,
+        child: AnimatedBuilder(
+          animation: widget.themeController,
+          builder: (context, _) => ListView(
+            padding: const EdgeInsets.fromLTRB(
+                HubSpace.md, HubSpace.sm, HubSpace.md, HubSpace.xl),
+            children: [
+              _SettingsCard(
+                title: tr('Ø§Ù„Ù„ØºØ©'),
+                subtitle: tr('Ø§Ø®ØªØ± Ù„ØºØ© Ø§Ù„ÙˆØ§Ø¬Ù‡Ø© ÙˆØ§ØªØ¬Ø§Ù‡Ù‡Ø§'),
+                icon: Icons.language_rounded,
+                trailing: const LanguageSwitcherButton(showLabel: true),
+              ),
+              const SizedBox(height: 14),
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(18),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          const Icon(Icons.contrast_rounded),
+                          const SizedBox(width: 10),
+                          Text(tr('Ø§Ù„Ù…Ø¸Ù‡Ø±'),
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .titleMedium
+                                  ?.copyWith(fontWeight: FontWeight.w800)),
+                        ],
+                      ),
+                      const SizedBox(height: 14),
+                      SegmentedButton<ThemeMode>(
+                        segments: [
+                          ButtonSegment(
+                              value: ThemeMode.system,
+                              icon: const Icon(Icons.computer_rounded),
+                              label: Text(tr('Ø§Ù„Ù†Ø¸Ø§Ù…'))),
+                          ButtonSegment(
+                              value: ThemeMode.light,
+                              icon: const Icon(Icons.light_mode_outlined),
+                              label: Text(tr('ÙØ§ØªØ­'))),
+                          ButtonSegment(
+                              value: ThemeMode.dark,
+                              icon: const Icon(Icons.dark_mode_outlined),
+                              label: Text(tr('Ø¯Ø§ÙƒÙ†'))),
+                        ],
+                        selected: {widget.themeController.mode},
+                        onSelectionChanged: (value) =>
+                            widget.themeController.setMode(value.single),
+                      ),
+                      const SizedBox(height: 14),
+                      Text(
+                        tr('Ø§Ø®ØªØ± Ù„ÙˆØ­Ø© Ø§Ù„Ø£Ù„ÙˆØ§Ù†'),
+                        style: TextStyle(
+                            color: context.hubScheme.onSurfaceVariant,
+                            fontWeight: FontWeight.w700),
+                      ),
+                      const SizedBox(height: HubSpace.sm),
+                      _PaletteSelector(
+                        selected: widget.themeController.preferences.preset,
+                        enabled: !widget.themeController.saving,
+                        onSelected: widget.themeController.setPreset,
+                      ),
+                      const SizedBox(height: HubSpace.lg),
+                      Divider(color: context.hubScheme.outlineVariant),
+                      const SizedBox(height: HubSpace.sm),
+                      _CustomColorEditor(controller: widget.themeController),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 14),
+              _SettingsCard(
+                title: usesNativePush
+                    ? tr('Ø¥Ø´Ø¹Ø§Ø±Ø§Øª Ø§Ù„Ø¬Ù‡Ø§Ø²')
+                    : tr('Ø¥Ø´Ø¹Ø§Ø±Ø§Øª Ø§Ù„Ù…ØªØµÙØ­'),
+                subtitle: usesNativePush
+                    ? (widget.pushNotifications!.isConfigured
+                        ? (pushPermission == PushPermissionState.granted ||
+                                pushPermission == PushPermissionState.provisional
+                            ? tr('Ø§Ù„Ø¥Ø´Ø¹Ø§Ø±Ø§Øª Ù…ÙØ¹Ù„Ø© Ø®Ø§Ø±Ø¬ Ø§Ù„ØªØ·Ø¨ÙŠÙ‚.')
+                            : tr('ÙØ¹Ù‘Ù„ Ø§Ù„Ø¥Ø´Ø¹Ø§Ø±Ø§Øª Ù„ØªØ¸Ù‡Ø± Ø±Ø³Ø§Ø¦Ù„ Ø§Ù„Ø¹Ù…Ù„Ø§Ø¡ Ø¹Ù†Ø¯Ù…Ø§ ÙŠÙƒÙˆÙ† Ø§Ù„ØªØ·Ø¨ÙŠÙ‚ ÙÙŠ Ø§Ù„Ø®Ù„ÙÙŠØ© Ø£Ùˆ Ù…ØºÙ„Ù‚Ù‹Ø§.'))
+                        : tr('Firebase ØºÙŠØ± Ù…Ù‡ÙŠØ£ Ù„Ù‡Ø°Ø§ Ø§Ù„Ø¥ØµØ¯Ø§Ø±. Ø£Ø¶Ù Ø¥Ø¹Ø¯Ø§Ø¯Ø§Øª Firebase Ø£ÙˆÙ„Ù‹Ø§.'))
+                    : (browserNotifications.isGranted
+                        ? tr('Ø§Ù„Ø¥Ø´Ø¹Ø§Ø±Ø§Øª Ù…ÙØ¹Ù„Ø© Ù„Ù„Ø±Ø³Ø§Ø¦Ù„ Ø§Ù„Ø¬Ø¯ÙŠØ¯Ø©.')
+                        : tr('ÙØ¹Ù‘Ù„ Ø§Ù„ØªÙ†Ø¨ÙŠÙ‡Ø§Øª Ø­ØªÙ‰ ØªØ¸Ù‡Ø± Ø§Ù„Ø±Ø³Ø§Ø¦Ù„ Ø§Ù„Ø¬Ø¯ÙŠØ¯Ø© Ø®Ø§Ø±Ø¬ Ø§Ù„Ù„ÙˆØ­Ø©.')),
+                icon: (usesNativePush
+                            ? pushPermission == PushPermissionState.granted ||
+                                pushPermission == PushPermissionState.provisional
+                            : browserNotifications.isGranted)
+                        ? Icons.notifications_active_rounded
+                        : Icons.notifications_none_rounded,
+                trailing: FilledButton.tonal(
+                  onPressed: checkingPushPermission
+                      ? null
+                      : (usesNativePush
+                          ? (widget.pushNotifications!.isConfigured
+                              ? _enableNotifications
+                              : null)
+                          : (browserNotifications.isSupported
+                              ? _enableNotifications
+                              : null)),
+                  child: Text((usesNativePush
+                              ? pushPermission == PushPermissionState.granted ||
+                                  pushPermission == PushPermissionState.provisional
+                              : browserNotifications.isGranted)
+                          ? tr('Ù…ÙØ¹Ù„Ø©')
+                          : tr('ØªÙØ¹ÙŠÙ„')),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _enableNotifications() async {
+    if (usesNativePush) {
+      setState(() => checkingPushPermission = true);
+      var granted = false;
+      try {
+        granted =
+            await widget.pushNotifications!.requestPermissionAndRegister();
+        pushPermission = await widget.pushNotifications!.permissionState();
+      } catch (_) {
+        granted = false;
+      }
+      if (!mounted) return;
+      setState(() => checkingPushPermission = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            granted
+                ? tr('ØªÙ… ØªÙØ¹ÙŠÙ„ Ø¥Ø´Ø¹Ø§Ø±Ø§Øª Ø§Ù„Ø¬Ù‡Ø§Ø².')
+                : tr('Ù„Ù… ÙŠØªÙ… Ø§Ù„Ø³Ù…Ø§Ø­ Ø¨Ø§Ù„Ø¥Ø´Ø¹Ø§Ø±Ø§Øª. ÙØ¹Ù‘Ù„Ù‡Ø§ Ù…Ù† Ø¥Ø¹Ø¯Ø§Ø¯Ø§Øª Ø§Ù„Ø¬Ù‡Ø§Ø².'),
+          ),
+        ),
+      );
+      return;
+    }
+
+    final granted = await browserNotifications.requestPermission();
+    if (!mounted) return;
+    setState(() {});
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          granted
+              ? tr('ØªÙ… ØªÙØ¹ÙŠÙ„ Ø¥Ø´Ø¹Ø§Ø±Ø§Øª Ø§Ù„Ù…ØªØµÙØ­ Ù„Ù„Ø±Ø³Ø§Ø¦Ù„ Ø§Ù„Ø¬Ø¯ÙŠØ¯Ø©.')
+              : tr('Ù„Ù… ÙŠØªÙ… Ø§Ù„Ø³Ù…Ø§Ø­ Ø¨Ø§Ù„Ø¥Ø´Ø¹Ø§Ø±Ø§Øª. ÙØ¹Ù‘Ù„Ù‡Ø§ Ù…Ù† Ø¥Ø¹Ø¯Ø§Ø¯Ø§Øª Ø§Ù„Ù…ÙˆÙ‚Ø¹.'),
+        ),
+      ),
+    );
+  }
+}
+
+class _PaletteSelector extends StatelessWidget {
+  const _PaletteSelector({
+    required this.selected,
+    required this.enabled,
+    required this.onSelected,
+  });
+
+  final SupportHubThemePreset selected;
+  final bool enabled;
+  final ValueChanged<SupportHubThemePreset> onSelected;
+
+  static const choices = <_PaletteChoice>[
+    _PaletteChoice(
+      preset: SupportHubThemePreset.defaultTheme,
+      label: 'Wasl',
+      colors: [Color(0xFF7FC1AC), Color(0xFF5FA88F), Color(0xFFDDF3EC)],
+    ),
+    _PaletteChoice(
+      preset: SupportHubThemePreset.obsidianBlue,
+      label: 'Obsidian',
+      colors: [Color(0xFF4C63FF), Color(0xFF55B99B), Color(0xFFE9ECFF)],
+    ),
+    _PaletteChoice(
+      preset: SupportHubThemePreset.midnightViolet,
+      label: 'Violet',
+      colors: [Color(0xFF7848E8), Color(0xFF58BCA2), Color(0xFFEFE7FF)],
+    ),
+    _PaletteChoice(
+      preset: SupportHubThemePreset.graphiteCopper,
+      label: 'Copper',
+      colors: [Color(0xFFB85F35), Color(0xFF4BA78E), Color(0xFFF7E2D6)],
+    ),
+  ];
+
+  @override
+  Widget build(BuildContext context) => Wrap(
+        spacing: HubSpace.md,
+        runSpacing: HubSpace.md,
+        children: choices.map((choice) {
+          final active = choice.preset == selected;
+          return Semantics(
+            selected: active,
+            button: true,
+            label: choice.label,
+            child: InkWell(
+              onTap: enabled ? () => onSelected(choice.preset) : null,
+              borderRadius: BorderRadius.circular(HubRadius.md),
+              child: AnimatedContainer(
+                duration: HubMotion.standard,
+                width: 82,
+                padding: const EdgeInsets.symmetric(
+                    horizontal: HubSpace.xs, vertical: HubSpace.sm),
+                decoration: BoxDecoration(
+                  color: active
+                      ? context.hubScheme.primaryContainer
+                      : context.hubScheme.surfaceContainerLow,
+                  borderRadius: BorderRadius.circular(HubRadius.md),
+                  border: Border.all(
+                    color: active
+                        ? context.hubScheme.primary
+                        : context.hubScheme.outlineVariant
+                            .withValues(alpha: .42),
+                    width: active ? 2 : 1,
+                  ),
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    SizedBox(
+                      width: 48,
+                      height: 34,
+                      child: Stack(
+                        alignment: Alignment.center,
+                        children: [
+                          for (var index = 0;
+                              index < choice.colors.length;
+                              index++)
+                            PositionedDirectional(
+                              start: index * 12,
+                              child: Container(
+                                width: 30,
+                                height: 30,
+                                decoration: BoxDecoration(
+                                  color: choice.colors[index],
+                                  shape: BoxShape.circle,
+                                  border: Border.all(
+                                      color: context.hubScheme.surface,
+                                      width: 2),
+                                ),
+                              ),
+                            ),
+                          if (active)
+                            Align(
+                              alignment: AlignmentDirectional.bottomEnd,
+                              child: Container(
+                                width: 18,
+                                height: 18,
+                                decoration: BoxDecoration(
+                                  color: context.hubScheme.primary,
+                                  shape: BoxShape.circle,
+                                ),
+                                child: Icon(Icons.check_rounded,
+                                    size: 13,
+                                    color: context.hubScheme.onPrimary),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 5),
+                    Text(choice.label,
+                        maxLines: 1,
+                        style: const TextStyle(
+                            fontSize: 10.5, fontWeight: FontWeight.w700)),
+                  ],
+                ),
+              ),
+            ),
+          );
+        }).toList(),
+      );
+}
+
+class _PaletteChoice {
+  const _PaletteChoice({
+    required this.preset,
+    required this.label,
+    required this.colors,
+  });
+  final SupportHubThemePreset preset;
+  final String label;
+  final List<Color> colors;
+}
+
+class _CustomColorEditor extends StatelessWidget {
+  const _CustomColorEditor({required this.controller});
+  final ThemeController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = SupportHubPalette.resolve(
+        controller.preferences, Theme.of(context).brightness);
+    final fields = [
+      _CustomColorField('primaryColor', tr('Ø§Ù„Ù„ÙˆÙ† Ø§Ù„Ø£Ø³Ø§Ø³ÙŠ'), palette.primary),
+      _CustomColorField('accentColor', tr('Ø§Ù„Ù„ÙˆÙ† Ø§Ù„Ù…Ø³Ø§Ø¹Ø¯'), palette.accent),
+      _CustomColorField(
+          'sentMessageBubble', tr('ÙÙ‚Ø§Ø¹Ø© Ø§Ù„Ø±Ø³Ø§Ø¦Ù„ Ø§Ù„Ù…Ø±Ø³Ù„Ø©'), palette.sent),
+      _CustomColorField('receivedMessageBubble', tr('ÙÙ‚Ø§Ø¹Ø© Ø§Ù„Ø±Ø³Ø§Ø¦Ù„ Ø§Ù„Ù…Ø³ØªÙ„Ù…Ø©'),
+          palette.received),
+      _CustomColorField(
+          'backgroundColor', tr('Ø®Ù„ÙÙŠØ© Ø§Ù„ØªØ·Ø¨ÙŠÙ‚'), palette.background),
+      _CustomColorField(
+          'surfaceColor', tr('Ø§Ù„Ø¨Ø·Ø§Ù‚Ø§Øª ÙˆØ§Ù„Ø£Ø³Ø·Ø­'), palette.surface),
+      _CustomColorField(
+          'navigationColor', tr('Ø´Ø±ÙŠØ· Ø§Ù„ØªÙ†Ù‚Ù„ Ø§Ù„Ø³ÙÙ„ÙŠ'), palette.navigation),
+    ];
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(tr('ØªØ®ØµÙŠØµ Ø§Ù„Ø£Ù„ÙˆØ§Ù†'),
+                      style: Theme.of(context)
+                          .textTheme
+                          .titleSmall
+                          ?.copyWith(fontWeight: FontWeight.w900)),
+                  const SizedBox(height: 2),
+                  Text(tr('Ø§Ø®ØªÙŠØ§Ø±ÙŠ â€” Ø§Ø®ØªØ± Ø¨ØµØ±ÙŠÙ‹Ø§ Ø¨Ø¯ÙˆÙ† Ø£ÙƒÙˆØ§Ø¯ Ø£Ùˆ Ø£Ø±Ù‚Ø§Ù….'),
+                      style: TextStyle(
+                          color: context.hubScheme.onSurfaceVariant,
+                          fontSize: 12.5)),
+                ],
+              ),
+            ),
+            if (controller.preferences.customColors.isNotEmpty)
+              TextButton(
+                onPressed: controller.saving
+                    ? null
+                    : () => controller.clearCustomColors(),
+                child: Text(tr('Ø¥Ø¹Ø§Ø¯Ø© Ø§Ù„Ø¶Ø¨Ø·')),
+              ),
+          ],
+        ),
+        const SizedBox(height: HubSpace.sm),
+        for (final field in fields)
+          _ColorFieldTile(
+            field: field,
+            customized:
+                controller.preferences.customColors.containsKey(field.key),
+            enabled: !controller.saving,
+            onTap: () => _pickColor(context, field),
+          ),
+      ],
+    );
+  }
+
+  Future<void> _pickColor(BuildContext context, _CustomColorField field) async {
+    final brightness = Theme.of(context).brightness;
+    final colors = _colorChoices(field.key, brightness);
+    final selected = await showModalBottomSheet<Color>(
+      context: context,
+      showDragHandle: true,
+      builder: (sheetContext) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 4, 20, 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(field.label,
+                  style: Theme.of(sheetContext)
+                      .textTheme
+                      .titleLarge
+                      ?.copyWith(fontWeight: FontWeight.w900)),
+              const SizedBox(height: 4),
+              Text(tr('Ø§Ø®ØªØ± Ø§Ù„Ù„ÙˆÙ† Ø§Ù„Ù…Ù†Ø§Ø³Ø¨ ÙˆØ³ÙŠÙØ·Ø¨Ù‘Ù‚ Ù…Ø¨Ø§Ø´Ø±Ø©.'),
+                  style: TextStyle(
+                      color:
+                          Theme.of(sheetContext).colorScheme.onSurfaceVariant)),
+              const SizedBox(height: 18),
+              Center(
+                child: Wrap(
+                  alignment: WrapAlignment.center,
+                  spacing: 12,
+                  runSpacing: 12,
+                  children: [
+                    for (final color in colors)
+                      Semantics(
+                        button: true,
+                        selected: color.toARGB32() == field.color.toARGB32(),
+                        label: field.label,
+                        child: InkWell(
+                          onTap: () => Navigator.pop(sheetContext, color),
+                          customBorder: const CircleBorder(),
+                          child: Container(
+                            width: 48,
+                            height: 48,
+                            decoration: BoxDecoration(
+                              color: color,
+                              shape: BoxShape.circle,
+                              border: Border.all(
+                                  color: Theme.of(sheetContext)
+                                      .colorScheme
+                                      .outlineVariant,
+                                  width: 2),
+                            ),
+                            child: color.toARGB32() == field.color.toARGB32()
+                                ? Icon(Icons.check_rounded,
+                                    color: ThemeContrastValidator.readableText(
+                                        color))
+                                : null,
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+              if (controller.preferences.customColors
+                  .containsKey(field.key)) ...[
+                const SizedBox(height: 14),
+                Center(
+                  child: TextButton.icon(
+                    onPressed: () {
+                      Navigator.pop(sheetContext);
+                      controller.clearCustomColor(field.key);
+                    },
+                    icon: const Icon(Icons.restart_alt_rounded),
+                    label: Text(tr('Ø§Ø³ØªØ®Ø¯Ø§Ù… Ù„ÙˆÙ† Ø§Ù„Ù„ÙˆØ­Ø© Ø§Ù„Ø¬Ø§Ù‡Ø²Ø©')),
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+    if (selected != null) {
+      await controller.setCustomColor(field.key, selected);
+    }
+  }
+
+  List<Color> _colorChoices(String key, Brightness brightness) {
+    final dark = brightness == Brightness.dark;
+    if (key == 'backgroundColor' || key == 'surfaceColor' || key == 'navigationColor') {
+      return dark
+          ? const [
+              Color(0xFF0B0C0E),
+              Color(0xFF121417),
+              Color(0xFF16181B),
+              Color(0xFF1A1C20),
+              Color(0xFF202226),
+              Color(0xFF15121C),
+              Color(0xFF191411),
+              Color(0xFF141820),
+            ]
+          : const [
+              Color(0xFFFFFFFF),
+              Color(0xFFF7F7F9),
+              Color(0xFFF4F2FA),
+              Color(0xFFF1F8F5),
+              Color(0xFFFAF4F0),
+              Color(0xFFF3F6FB),
+              Color(0xFFFFF8E8),
+              Color(0xFFF5F5F5),
+            ];
+    }
+    if (key == 'sentMessageBubble' || key == 'receivedMessageBubble') {
+      return dark
+          ? const [
+              Color(0xFF203D36),
+              Color(0xFF252B52),
+              Color(0xFF352252),
+              Color(0xFF45291F),
+              Color(0xFF17354A),
+              Color(0xFF3A2430),
+              Color(0xFF202126),
+              Color(0xFF2B3038),
+            ]
+          : const [
+              Color(0xFFE2F6EF),
+              Color(0xFFE9ECFF),
+              Color(0xFFEFE7FF),
+              Color(0xFFF7E2D6),
+              Color(0xFFE3F3FF),
+              Color(0xFFFFE7F0),
+              Color(0xFFFFFFFF),
+              Color(0xFFF0F1F4),
+            ];
+    }
+    return const [
+      Color(0xFF7FC1AC),
+      Color(0xFF5FA88F),
+      Color(0xFF4C63FF),
+      Color(0xFF1677D2),
+      Color(0xFF36A886),
+      Color(0xFF087A5B),
+      Color(0xFFB85F35),
+      Color(0xFFE07A48),
+      Color(0xFFD84A68),
+      Color(0xFFB33EA4),
+      Color(0xFF334155),
+      Color(0xFF111827),
+    ];
+  }
+}
+
+class _CustomColorField {
+  const _CustomColorField(this.key, this.label, this.color);
+  final String key;
+  final String label;
+  final Color color;
+}
+
+class _ColorFieldTile extends StatelessWidget {
+  const _ColorFieldTile({
+    required this.field,
+    required this.customized,
+    required this.enabled,
+    required this.onTap,
+  });
+  final _CustomColorField field;
+  final bool customized;
+  final bool enabled;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsets.only(bottom: 7),
+        child: Material(
+          color: context.hubScheme.surfaceContainerLow,
+          borderRadius: BorderRadius.circular(HubRadius.md),
+          child: InkWell(
+            onTap: enabled ? onTap : null,
+            borderRadius: BorderRadius.circular(HubRadius.md),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              child: Row(
+                children: [
+                  Container(
+                    width: 34,
+                    height: 34,
+                    decoration: BoxDecoration(
+                      color: field.color,
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                          color: context.hubScheme.outlineVariant, width: 2),
+                    ),
+                    child: customized
+                        ? Icon(Icons.check_rounded,
+                            size: 18,
+                            color: ThemeContrastValidator.readableText(
+                                field.color))
+                        : null,
+                  ),
+                  const SizedBox(width: 11),
+                  Expanded(
+                      child: Text(field.label,
+                          style: const TextStyle(fontWeight: FontWeight.w700))),
+                  Icon(Icons.chevron_right_rounded,
+                      color: context.hubScheme.onSurfaceVariant),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+}
+
+class _SettingsCard extends StatelessWidget {
+  const _SettingsCard({
+    required this.title,
+    required this.subtitle,
+    required this.icon,
+    required this.trailing,
+  });
+
+  final String title;
+  final String subtitle;
+  final IconData icon;
+  final Widget trailing;
+
+  @override
+  Widget build(BuildContext context) => Card(
+        child: Padding(
+          padding: const EdgeInsets.all(18),
+          child: Row(
+            children: [
+              Icon(icon),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(title,
+                        style: const TextStyle(fontWeight: FontWeight.w800)),
+                    const SizedBox(height: 3),
+                    Text(subtitle,
+                        style: TextStyle(
+                            color: Theme.of(context)
+                                .colorScheme
+                                .onSurfaceVariant)),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 12),
+              trailing,
+            ],
+          ),
+        ),
+      );
+}
+===== theme_preferences.dart =====
+import 'package:flutter/material.dart';
+
+enum SupportHubThemePreset {
+  defaultTheme,
+  obsidianBlue,
+  midnightViolet,
+  graphiteCopper
+}
+
+class ThemePreferences {
+  const ThemePreferences({
+    this.mode = ThemeMode.system,
+    this.preset = SupportHubThemePreset.defaultTheme,
+    this.customColors = const {},
+    this.source = 'app_default',
+  });
+
+  final ThemeMode mode;
+  final SupportHubThemePreset preset;
+  final Map<String, String> customColors;
+  final String source;
+
+  factory ThemePreferences.fromApi(Map<String, dynamic> json) {
+    final effective =
+        Map<String, dynamic>.from((json['effective'] as Map?) ?? json);
+    final colors = Map<String, dynamic>.from(
+        (effective['customColors'] as Map?) ?? const {});
+    return ThemePreferences(
+      mode: _mode(effective['mode']?.toString()),
+      preset: _preset(effective['preset']?.toString()),
+      customColors: colors.map((key, value) => MapEntry(key, value.toString())),
+      source: json['source']?.toString() ?? 'app_default',
+    );
+  }
+
+  Map<String, dynamic> toApi() => {
+        'mode': mode.name,
+        'preset': switch (preset) {
+          SupportHubThemePreset.defaultTheme => 'default',
+          SupportHubThemePreset.obsidianBlue => 'obsidian_blue',
+          SupportHubThemePreset.midnightViolet => 'midnight_violet',
+          SupportHubThemePreset.graphiteCopper => 'graphite_copper',
+        },
+        if (customColors.isNotEmpty) 'customColors': customColors,
+      };
+
+  ThemePreferences copyWith(
+          {ThemeMode? mode,
+          SupportHubThemePreset? preset,
+          Map<String, String>? customColors,
+          String? source}) =>
+      ThemePreferences(
+        mode: mode ?? this.mode,
+        preset: preset ?? this.preset,
+        customColors: customColors ?? this.customColors,
+        source: source ?? this.source,
+      );
+
+  static ThemeMode _mode(String? value) => switch (value) {
+        'light' => ThemeMode.light,
+        'dark' => ThemeMode.dark,
+        _ => ThemeMode.system,
+      };
+
+  static SupportHubThemePreset _preset(String? value) => switch (value) {
+        'obsidian_blue' => SupportHubThemePreset.obsidianBlue,
+        'midnight_violet' => SupportHubThemePreset.midnightViolet,
+        'graphite_copper' => SupportHubThemePreset.graphiteCopper,
+        _ => SupportHubThemePreset.defaultTheme,
+      };
+}
+===== workspace_shell.dart =====
+import 'dart:async';
+import 'dart:ui';
+import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
+import '../../core/localization/app_locale_controller.dart';
+import '../../core/network/api_client.dart';
+import '../../core/notifications/push_notification_service.dart';
+import '../../core/theme/support_hub_design.dart';
+import '../../core/theme/theme_controller.dart';
+import '../../core/widgets/support_hub_widgets.dart';
+import '../account/account_screen.dart';
+import '../auth/auth_controller.dart';
+import '../auth/user_model.dart';
+import '../conversations/conversation_realtime_client.dart';
+import '../conversations/conversation_service.dart';
+import '../conversations/conversations_screen.dart';
+import '../customers/customers_screen.dart';
+import '../management/management_hub_screen.dart';
+import '../notifications/notifications_screen.dart';
+import 'workspace_capabilities.dart';
+
+class WorkspaceShell extends StatefulWidget {
+  const WorkspaceShell({
+    super.key,
+    required this.controller,
+    required this.api,
+    required this.themeController,
+    required this.pushNotifications,
+  });
+
+  final AuthController controller;
+  final ApiClient api;
+  final ThemeController themeController;
+  final PushNotificationService pushNotifications;
+
+  @override
+  State<WorkspaceShell> createState() => _WorkspaceShellState();
+}
+
+class _WorkspaceShellState extends State<WorkspaceShell> {
+  int index = 0;
+  int unreadCount = 0;
+  late final WorkspaceCapabilities capabilities;
+  late final List<_ShellDestination> destinations;
+  ConversationRealtimeClient? realtime;
+  StreamSubscription<Map<String, dynamic>>? subscription;
+  Timer? debounce;
+
+  @override
+  void initState() {
+    super.initState();
+    final user = widget.controller.user!;
+    capabilities = WorkspaceCapabilities.forUser(user);
+    destinations = _destinations(user);
+    if (capabilities.notifications) {
+      realtime = ConversationRealtimeClient(widget.api);
+      subscription = realtime!.events.listen((event) {
+        final type = event['type']?.toString();
+        if (type == 'heartbeat' || type == 'connected') return;
+        debounce?.cancel();
+        debounce = Timer(
+          const Duration(milliseconds: 350),
+          _refreshUnread,
+        );
+      });
+      realtime!.start();
+      _refreshUnread();
+    }
+  }
+
+  @override
+  void dispose() {
+    debounce?.cancel();
+    subscription?.cancel();
+    realtime?.dispose();
+    super.dispose();
+  }
+
+  List<_ShellDestination> _destinations(UserModel user) {
+    final items = <_ShellDestination>[];
+    if (kIsWeb && capabilities.platformAdmin) {
+      items.add(_ShellDestination(
+        label: 'Ø§Ù„Ù…Ù†ØµØ©',
+        icon: Icons.grid_view_outlined,
+        selectedIcon: Icons.grid_view_rounded,
+        page:
+            ManagementHubScreen(api: widget.api, controller: widget.controller),
+      ));
+    } else {
+      if (capabilities.conversations) {
+        items.add(_ShellDestination(
+          label: 'Ø§Ù„Ø±Ø¦ÙŠØ³ÙŠØ©',
+          icon: Icons.home_outlined,
+          selectedIcon: Icons.home_rounded,
+          page: ConversationsScreen(
+            api: widget.api,
+            user: user,
+            manualConversationsEnabled: false,
+            aiEnabled: user.hasPermission('ai.draft'),
+          ),
+        ));
+      }
+      if (capabilities.customers) {
+        items.add(_ShellDestination(
+          label: 'Ø§Ù„Ø¹Ù…Ù„Ø§Ø¡',
+          icon: Icons.people_outline_rounded,
+          selectedIcon: Icons.people_rounded,
+          page: CustomersScreen(api: widget.api, user: user),
+        ));
+      }
+      if (capabilities.notifications) {
+        items.add(_ShellDestination(
+          label: 'Ø§Ù„ØªÙ†Ø¨ÙŠÙ‡Ø§Øª',
+          icon: Icons.notifications_none_rounded,
+          selectedIcon: Icons.notifications_rounded,
+          badge: true,
+          page: NotificationsScreen(
+            api: widget.api,
+            user: user,
+            onCountChanged: _setUnreadCount,
+          ),
+        ));
+      }
+      if (kIsWeb && capabilities.management) {
+        items.add(_ShellDestination(
+          label: 'Ø§Ù„Ø¥Ø¯Ø§Ø±Ø©',
+          icon: Icons.space_dashboard_outlined,
+          selectedIcon: Icons.space_dashboard_rounded,
+          page: ManagementHubScreen(
+              api: widget.api, controller: widget.controller),
+        ));
+      }
+    }
+    items.add(_ShellDestination(
+      label: 'Ø§Ù„Ø¥Ø¹Ø¯Ø§Ø¯Ø§Øª',
+      icon: Icons.settings_outlined,
+      selectedIcon: Icons.settings_rounded,
+      page: AccountScreen(
+        controller: widget.controller,
+        api: widget.api,
+        themeController: widget.themeController,
+        pushNotifications: widget.pushNotifications,
+      ),
+    ));
+    return items;
+  }
+
+  void _setUnreadCount(int value) {
+    if (mounted && unreadCount != value) {
+      setState(() => unreadCount = value);
+    }
+  }
+
+  Future<void> _refreshUnread() async {
+    try {
+      final conversations =
+          await ConversationService(widget.api).list(unreadOnly: true);
+      _setUnreadCount(
+        conversations.fold<int>(0, (sum, item) => sum + item.unreadCount),
+      );
+    } catch (_) {
+      // Realtime reconnects without blocking navigation. New-message details
+      // stay in the inbox and Notifications tab; no foreground popup is shown.
+    }
+  }
+
+
+  Widget _icon(_ShellDestination destination, {required bool selected}) {
+    Widget icon = Icon(selected ? destination.selectedIcon : destination.icon);
+    if (selected) {
+      icon = Container(
+        width: 34,
+        height: 34,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: context.hubColors.navigationSelected,
+          border: Border.all(
+            color: context.hubScheme.primary.withValues(alpha: .45),
+          ),
+        ),
+        child: icon,
+      );
+    }
+    if (!destination.badge || unreadCount == 0) return icon;
+    return Badge(
+      label: Text(unreadCount > 99 ? '99+' : '$unreadCount'),
+      child: icon,
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final body = IndexedStack(
+      index: index,
+      children: destinations.map((destination) => destination.page).toList(),
+    );
+    if (MediaQuery.sizeOf(context).width >= 980) {
+      return Scaffold(
+        body: Row(
+          children: [
+            SafeArea(
+              child: NavigationRail(
+                selectedIndex: index,
+                onDestinationSelected: (value) => setState(() => index = value),
+                labelType: NavigationRailLabelType.all,
+                groupAlignment: -.35,
+                leading: Padding(
+                  padding: const EdgeInsets.only(top: HubSpace.md),
+                  child: SupportHubMark(size: 38),
+                ),
+                destinations: destinations
+                    .map((destination) => NavigationRailDestination(
+                          icon: _icon(destination, selected: false),
+                          selectedIcon: _icon(destination, selected: true),
+                          label: Text(tr(destination.label)),
+                        ))
+                    .toList(),
+              ),
+            ),
+            VerticalDivider(width: 1, color: context.hubScheme.outlineVariant),
+            Expanded(child: body),
+          ],
+        ),
+      );
+    }
+
+    final isIos = defaultTargetPlatform == TargetPlatform.iOS;
+    final dockRadius = BorderRadius.circular(36);
+    final navigation = SizedBox(
+      height: 56,
+      child: Row(
+        children: List.generate(destinations.length, (itemIndex) {
+          final destination = destinations[itemIndex];
+          final selected = index == itemIndex;
+
+          return Expanded(
+            child: InkWell(
+              borderRadius: BorderRadius.circular(28),
+              onTap: () => setState(() => index = itemIndex),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _icon(destination, selected: selected),
+                  const SizedBox(height: 2),
+                  Text(
+                    tr(destination.label),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 10.5,
+                      height: 1,
+                      fontWeight:
+                          selected ? FontWeight.w800 : FontWeight.w600,
+                      color: selected
+                          ? context.hubScheme.primary
+                          : context.hubScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        }),
+      ),
+    );
+
+    Widget dockSurface({required double opacity}) => Container(
+          decoration: BoxDecoration(
+            color: context.hubColors.navigation.withValues(alpha: opacity),
+            borderRadius: dockRadius,
+            border: Border.all(
+              color: context.hubScheme.outlineVariant.withValues(alpha: .58),
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(
+                  alpha: Theme.of(context).brightness == Brightness.dark
+                      ? .30
+                      : .10,
+                ),
+                blurRadius: 22,
+                offset: const Offset(0, 8),
+              ),
+            ],
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: navigation,
+        );
+
+    final navigationDock = SafeArea(
+      top: false,
+      minimum: const EdgeInsets.fromLTRB(14, 0, 14, 4),
+      child: isIos
+          ? ClipRRect(
+              borderRadius: dockRadius,
+              child: BackdropFilter(
+                filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+                child: dockSurface(opacity: .82),
+              ),
+            )
+          : dockSurface(opacity: .98),
+    );
+
+    return Scaffold(
+      backgroundColor: context.hubScheme.surfaceContainerLowest,
+      body: Stack(
+        fit: StackFit.expand,
+        children: [
+          body,
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: 0,
+            child: navigationDock,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ShellDestination {
+  const _ShellDestination({
+    required this.label,
+    required this.icon,
+    required this.selectedIcon,
+    required this.page,
+    this.badge = false,
+  });
+  final String label;
+  final IconData icon;
+  final IconData selectedIcon;
+  final Widget page;
+  final bool badge;
+}

@@ -1,0 +1,9 @@
+Wasl Mobile 2.8.3+44
+
+1. Extract this archive over the current SupportHub-Mobile project and replace files.
+2. Run: flutter clean
+3. Run: flutter pub get
+4. Run: flutter analyze
+5. Run: flutter test
+
+For push notifications outside the app, build with real Firebase dart-defines and apply the matching server notification-channel patch.

@@ -1,0 +1,19 @@
+{
+  "message": {
+    "token": "FCM_DEVICE_TOKEN",
+    "notification": {
+      "title": "Wasl",
+      "body": "New customer message"
+    },
+    "data": {
+      "conversationId": "CONVERSATION_ID",
+      "type": "message.created"
+    },
+    "android": {
+      "notification": {
+        "channel_id": "wasl_messages",
+        "sound": "default"
+      }
+    }
+  }
+}

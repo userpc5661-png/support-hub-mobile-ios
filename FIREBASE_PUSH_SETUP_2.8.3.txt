@@ -1,0 +1,35 @@
+Wasl Mobile Push Setup (2.8.3+44)
+==================================
+
+The app code is now ready for native Android/iOS push notifications outside the app.
+Incoming messages DO NOT show a Wasl SnackBar/popup while the app is in the foreground.
+Inside Wasl, new messages only update unread counts, the chat list, and the Notifications tab.
+
+For Android push to become active, create a real file named:
+  firebase_defines.json
+
+Start from firebase_defines.example.json and fill the real Firebase Android app values:
+  FIREBASE_ANDROID_API_KEY
+  FIREBASE_ANDROID_APP_ID
+  FIREBASE_MESSAGING_SENDER_ID
+  FIREBASE_PROJECT_ID
+  FIREBASE_STORAGE_BUCKET   (optional)
+
+IMPORTANT:
+- Register the Firebase Android app with the existing package/application ID:
+  com.supporthub.support_hub
+- Do NOT change the applicationId just for Firebase.
+- Do not commit firebase_defines.json to source control.
+
+Run with Firebase enabled:
+  RUN_ANDROID.cmd
+
+Or from PowerShell:
+  & "E:\flutter\bin\flutter.bat" run --dart-define=API_BASE_URL=https://go-wasl.com/api --dart-define-from-file=firebase_defines.json
+
+The server must also have:
+  FIREBASE_PROJECT_ID
+  FIREBASE_CLIENT_EMAIL
+  FIREBASE_PRIVATE_KEY
+
+Use the matching Wasl Platform Push 2.8.3 patch so Android channel ID is `wasl_messages` on both sides.

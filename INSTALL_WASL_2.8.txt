@@ -1,0 +1,36 @@
+Wasl Mobile 2.8.0+41 — cumulative source update
+=================================================
+
+This archive is an overlay for the current Flutter mobile project and contains
+the complete source tree, branding assets, tests, Android files, and dependency
+lock file. It does not contain Firebase secrets.
+
+Recommended Windows PowerShell steps
+------------------------------------
+1. Back up or commit the current project.
+2. Extract this archive into the project root and allow replacement.
+3. From the project root run:
+
+& "E:\flutter\bin\flutter.bat" clean
+Remove-Item -Recurse -Force ".dart_tool" -ErrorAction SilentlyContinue
+Remove-Item -Recurse -Force "build" -ErrorAction SilentlyContinue
+& "E:\flutter\bin\flutter.bat" pub get
+& "E:\flutter\bin\flutter.bat" analyze
+& "E:\flutter\bin\flutter.bat" test
+& "E:\flutter\bin\flutter.bat" run
+
+Firebase push notifications
+---------------------------
+External notifications require real values matching the Firebase project used
+by the API. Copy firebase_defines.example.json to a private file, fill it, and
+build/run with the matching --dart-define-from-file option. Never commit keys.
+
+Example:
+& "E:\flutter\bin\flutter.bat" run --dart-define-from-file=firebase_defines.json
+
+Important
+---------
+- file_picker is pinned to 10.3.10 for the current Android/Flutter setup.
+- Store custom replies are created in the web dashboard; the mobile app only
+  retrieves the current store's active replies.
+- No password or AI/Firebase secret is bundled in this archive.

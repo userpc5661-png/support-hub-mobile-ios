@@ -1,0 +1,18 @@
+Wasl Mobile 2.6.0+35 — source validation
+
+Completed in the delivery environment:
+- Dart source files scanned: 76
+- Unbalanced Dart delimiters found: 0
+- Missing relative Dart imports found: 0
+- Android XML files parsed: 11
+- Android XML parsing errors: 0
+- pubspec.yaml parsed successfully
+
+Not run because Flutter SDK is not installed in the delivery environment:
+- flutter pub get
+- dart format
+- flutter analyze
+- flutter test
+- Android/iOS compilation
+
+Run CHECK_PROJECT.cmd in Android Studio before producing a release build.
