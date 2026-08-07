@@ -56,3 +56,5 @@ firebase_defines.json
 # Local generated artifacts
 .artifacts/
 release/
+# Backup files
+*.bak
