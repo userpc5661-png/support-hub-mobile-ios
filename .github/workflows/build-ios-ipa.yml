@@ -24,6 +24,15 @@ jobs:
       - name: Install dependencies
         run: flutter pub get
 
+      - name: Restore Firebase build defines
+        shell: bash
+        env:
+          FIREBASE_DEFINES_JSON: ${{ secrets.FIREBASE_DEFINES_JSON }}
+        run: |
+          if [ -n "$FIREBASE_DEFINES_JSON" ]; then
+            printf '%s' "$FIREBASE_DEFINES_JSON" > firebase_defines.json
+          fi
+
       - name: Validate iOS files
         run: |
           test -d ios
